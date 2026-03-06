@@ -20,6 +20,22 @@ function normCDF(z) {
   return 0.5 * (1 + sign * y);
 }
 
+// Parse "$85,960.00" or "85960" → number
+function parseMoney(v) {
+  if (v == null || v === "") return 0;
+  if (typeof v === "number") return v;
+  return parseFloat(String(v).replace(/[$,\s]/g, "")) || 0;
+}
+
+// Parse "96.08%" or "0.9608" → decimal
+function parsePct(v) {
+  if (v == null || v === "") return 0;
+  if (typeof v === "number") return v > 1 ? v / 100 : v;
+  const s = String(v).trim();
+  if (s.endsWith("%")) return parseFloat(s) / 100;
+  return parseFloat(s) || 0;
+}
+
 export function calcAthleticFit(position, height, weight, speed40, tier) {
   const std = ATH_STANDARDS[tier]?.[position];
   if (!std) return 0;
@@ -43,6 +59,12 @@ export function getSATPercentile(sat) {
   const keys = Object.keys(SAT_PERCENTILES).map(Number).sort((a,b) => b-a);
   for (const k of keys) { if (rounded >= k) return SAT_PERCENTILES[k]; }
   return 0.01;
+}
+
+// GPA → percentile [0..1]. Linear scale: GPA 1.0 → 0, GPA 3.7+ → 1.0
+// Matches GrittyOS acad_standards_test: GPA 3.70 → 1.000
+export function getGPAPercentile(gpa) {
+  return Math.min(1, Math.max(0, (gpa - 1.0) / 2.7));
 }
 
 export function calcEFC(agi, deps, control, schoolType) {
@@ -74,69 +96,85 @@ export function runQuickList(athlete, schools, trackerMap = {}) {
   const boost = calcAthleticBoost(awards);
   const athFit = {};
   TIER_ORDER.forEach(tier => {
-    athFit[tier] = Math.min(1, calcAthleticFit(position, height, weight, speed40, tier) + boost);
+    athFit[tier] = Math.min(1, calcAthleticFit(position, +height, +weight, +speed40, tier) + boost);
   });
 
   const topTier = TIER_ORDER.find(t => athFit[t] > 0.5) || null;
-  const recruitReach = topTier ? RECRUIT_BUDGETS[topTier] : 400;
+  const recruitReach = topTier ? RECRUIT_BUDGETS[topTier] : 450;
 
-  const satPct = sat ? getSATPercentile(sat) : null;
-  const acadRigorScore   = satPct !== null ? (satPct * 0.5 + 0.3) : 0.3;
-  const acadTestOptScore = gpa ? Math.min(1, gpa / 4.0 * 0.9 + 0.1) : 0.3;
+  // Athlete academic scores — matching GrittyOS acad_standards_test logic
+  const satAchieve = sat ? getSATPercentile(+sat) : 0;
+  const gpaPct     = gpa ? getGPAPercentile(+gpa) : 0;
+  const acadRigorScore   = sat ? (satAchieve + gpaPct) / 2 : gpaPct * 0.85;
+  const acadTestOptScore = gpaPct;
 
   const scored = schools.map(school => {
-    const dist = (school.Lat && school.Lng && hsLat && hsLng)
-      ? haversine(hsLat, hsLng, school.Lat, school.Lng) : 9999;
+    const lat = parseFloat(school.LATITUDE || school.Lat);
+    const lng = parseFloat(school.LONGITUDE || school.Lng);
+    const dist = (lat && lng && hsLat && hsLng)
+      ? haversine(+hsLat, +hsLng, lat, lng) : 9999;
 
+    // Athletic tier match: school.Type = "Power 4", "G5", "1-FCS", "2-Div II", "3-Div III"
     const tierMatch = topTier !== null && school.Type === topTier;
 
-    let acadScore = 0;
-    if (school.Test_Optional) {
-      acadScore = school.Acad_Test_Opt != null && school.Acad_Test_Opt <= acadTestOptScore
-        ? school.Acad_Test_Opt : 0;
-    } else {
-      acadScore = school.Acad_Rigor_Score != null && school.Acad_Rigor_Score <= acadRigorScore
-        ? school.Acad_Rigor_Score : 0;
-    }
+    // Academic fit — compare school threshold to athlete score
+    const isTestOpt  = school.Is_Test_Optional === "TRUE" || school.Is_Test_Optional === true;
+    const schoolRigor = isTestOpt
+      ? parseFloat(school.Acad_Rigor_Test_Opt_Senior) || 0
+      : parseFloat(school.Acad_Rigor_Senior) || 0;
+    const athleteAcad = isTestOpt ? acadTestOptScore : acadRigorScore;
+    const acadScore = schoolRigor > 0 && schoolRigor <= athleteAcad ? schoolRigor : 0;
 
     const eligible = tierMatch && dist <= recruitReach && acadScore > 0;
-    const coa = school["COA (Out-of-State)"] || school.COA || 0;
+
+    // Financial calculations
+    const coa  = parseMoney(school["COA (Out-of-State)"] || school.COA);
     const efcResult = (agi && dependents)
-      ? calcEFC(agi, dependents, school.Control, school.School_Type)
+      ? calcEFC(+agi, +dependents, school.Control, school["School Type"])
       : { eligible: false, efc: null };
 
-    const avgMerit = school.Avg_Merit || 0;
-    const shareFA  = school.Share_Stu_Any_Aid || 0;
-    const meritLikelihood = shareFA && school.Share_Pure_Need
-      ? Math.min(1, shareFA / (school.Share_Pure_Need * 0.55)) : 0;
+    const avgMerit    = parseMoney(school.Est_Avg_Merit || school["Avg Merit Award"]);
+    const shareFA     = parsePct(school.Share_Stu_Any_Aid);
+    const sharePureNeed = parsePct(school.Share_Stu_Need_Aid);
+    const meritLikelihood = shareFA && sharePureNeed
+      ? Math.min(1, shareFA / (sharePureNeed * 0.55)) : 0;
 
+    // Athletic scholarship estimate
+    const div  = school["NCAA Division"] || school.NCAA_Division || "";
     const conf = school.Conference || "";
-    const div  = school.NCAA_Division || "";
     let athSchol = 0;
     if (!["Ivy League","Pioneer"].includes(conf)) {
-      if (div==="1-FBS") athSchol = coa;
-      else if (div==="1-FCS") athSchol = coa * 0.6;
-      else if (div==="2-Div II") athSchol = coa * 0.3;
+      if (div === "1-FBS")    athSchol = coa;
+      else if (div === "1-FCS") athSchol = coa * 0.6;
+      else if (div === "2-Div II") athSchol = coa * 0.3;
     }
 
-    const efc = efcResult.efc || 0;
+    const efc    = efcResult.efc || 0;
     const netCost = efcResult.eligible
       ? Math.max(0, ((efc*4)*1.18) - Math.min(coa-efc, avgMerit*meritLikelihood))
       : null;
 
-    const dltv     = school.DLTV || 0;
-    const gradRate = school.Grad_Rate || 0;
-    const adltv    = dltv * gradRate;
-    const droi     = netCost > 0 ? Math.min(100, adltv/netCost) : (netCost===0 ? 100 : null);
+    const adltv    = parseMoney(school.ADLTV);
+    const gradRate = parsePct(school["Graduation Rate"] || school.Grad_Rate);
+    const dltv     = parseMoney(school.DLTV);
+    const adltvCalc = adltv || dltv * gradRate;
+    const droi     = netCost > 0 ? Math.min(100, adltvCalc/netCost) : (netCost===0 ? 100 : null);
     const breakEven = droi ? 40/droi : null;
     const tracker  = trackerMap[school.UNITID] || {};
 
     return {
-      ...school, dist: Math.round(dist), eligible, acadScore,
+      ...school,
+      dist: Math.round(dist), eligible, acadScore,
       athFitScore: athFit[school.Type] || 0,
       efcEligible: efcResult.eligible, efc, athSchol, avgMerit,
       meritLikelihood: Math.round(meritLikelihood*100),
-      netCost, dltv, gradRate, adltv, droi, breakEven, tracker,
+      netCost, dltv, gradRate, adltv: adltvCalc, droi, breakEven, tracker,
+      // Normalize for display
+      _schoolName: school["School Name"] || school.School_Name || "Unknown",
+      _divLabel: school["NCAA Division"] || school.NCAA_Division || "",
+      _coaNum: coa,
+      _qLink: school["Recruiting Q Link"] || school.q_link || "",
+      _coachLink: school["Coach Page"] || school.coach_link || "",
     };
   });
 
