@@ -217,7 +217,7 @@ export default function MapView({ schools, results, mode, filters, shortListIds 
       popupContent += `</div>`;
 
       const marker = L.marker([lat, lng], { icon: makeIcon(color, size) });
-      marker.bindPopup(popupContent, { maxWidth: 280 });
+      marker.bindPopup(popupContent, { maxWidth: 300, autoPan: false });
       cluster.addLayer(marker);
     });
 

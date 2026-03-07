@@ -361,7 +361,11 @@ select:focus { outline: none; border-color: var(--accent); }
   padding: 0 !important;
 }
 .leaflet-popup-tip { background: var(--surface) !important; }
-.leaflet-popup-content { margin: 0 !important; width: min(280px, calc(100vw - 40px)) !important; }
+.leaflet-popup-content { margin: 0 !important; width: min(300px, calc(100vw - 40px)) !important; }
+
+@media (max-width: 768px) {
+  .leaflet-popup-content-wrapper { max-height: 70vh !important; overflow-y: auto !important; }
+}
 .leaflet-popup-close-button { color: var(--muted) !important; top: 8px !important; right: 8px !important; font-size: 18px !important; }
 .leaflet-popup-close-button:hover { color: var(--text) !important; }
 
