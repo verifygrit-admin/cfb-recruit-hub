@@ -77,6 +77,18 @@ export function calcAthleticFit(position, height, weight, speed40, tier) {
   return (hScore + wScore + sScore) / 3;
 }
 
+// Returns individual component scores + standards for a given tier/position — used by StayGrittyModal
+export function calcAthleticComponents(position, height, weight, speed40, tier) {
+  const std = ATH_STANDARDS[tier]?.[position];
+  if (!std) return null;
+  return {
+    hScore: normCDF((height   - std.h50) / 1.5),
+    wScore: normCDF((weight   - std.w50) / (std.w50 * 0.05)),
+    sScore: 1 - normCDF((speed40 - std.s50) / 0.15),
+    std,
+  };
+}
+
 export function calcAthleticBoost(awards) {
   let boost = 0;
   if (awards.expectedStarter) boost += 0.05;

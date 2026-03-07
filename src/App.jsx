@@ -6,6 +6,7 @@ import ResultsTable from "./components/ResultsTable.jsx";
 import Sidebar from "./components/Sidebar.jsx";
 import Tutorial from "./components/Tutorial.jsx";
 import HelmetAnim from "./components/HelmetAnim.jsx";
+import StayGrittyModal from "./components/StayGrittyModal.jsx";
 import { fetchSchools, fetchTracker, saveRecruit, updateRecruit, geocodeHighSchool } from "./lib/api.js";
 import { runQuickList } from "./lib/scoring.js";
 
@@ -44,6 +45,7 @@ export default function App() {
   const [showResultsModal, setShowResultsModal] = useState(false);
   const [said, setSaid]                     = useState(null);   // SAID of last saved profile
   const [savedIdentity, setSavedIdentity]   = useState(null);   // { name, email } at save time
+  const [stayGrittyData, setStayGrittyData] = useState(null);   // results when topTier === null
   const browseAnimShown = useRef(false);
   const qlAnimShown     = useRef(false);
 
@@ -141,6 +143,14 @@ export default function App() {
         dependents: athlete.dependents ? (athlete.dependents === "4+" ? 4 : +athlete.dependents) : null,
       };
       const res = runQuickList(parsed, schools, tracker);
+
+      if (!res.topTier) {
+        // No athletic tier qualified — show Stay Gritty modal instead of results
+        setStayGrittyData(res);
+        saveRecruit({ ...parsed, timestamp: new Date().toISOString() }).catch(() => {});
+        return;
+      }
+
       setResults(res);
       setMode("quicklist");
       setPanel("map");
@@ -329,6 +339,15 @@ export default function App() {
       <footer className="app-footer">
         Support: <a href="mailto:verifygrit@gmail.com">verifygrit@gmail.com</a>
       </footer>
+
+      {stayGrittyData && (
+        <StayGrittyModal
+          results={stayGrittyData}
+          athlete={athlete}
+          onEditProfile={() => setStayGrittyData(null)}
+          onBrowse={() => { setStayGrittyData(null); setMode("browse"); }}
+        />
+      )}
 
       {showTutorial && <Tutorial type={tutorialType} onClose={() => setShowTutorial(false)} />}
       {showBrowseAnim && (
