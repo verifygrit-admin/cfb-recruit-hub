@@ -2,6 +2,8 @@
 
 **A recruiting intelligence platform for high school football student-athletes — built to surface realistic, high-value program matches based on athletic fit, academic credentials, geographic reach, and household financial data.**
 
+**[Live Tool → verifygrit-admin.github.io/cfb-recruit-hub](https://verifygrit-admin.github.io/cfb-recruit-hub/)**
+
 > **This is not a recruiting service and not a scouting service.** This tool does not connect athletes to coaches, evaluate player talent, or facilitate contact between any parties. It is a data-driven research and decision-support tool. Use it to build a realistic school list, understand your financial picture, and take direct action through recruiting questionnaire links.
 
 ---
