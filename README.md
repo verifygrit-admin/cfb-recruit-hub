@@ -1,25 +1,56 @@
 # GrittyOS — CFB Recruit Hub
 
-A recruiting intelligence platform for high school football student-athletes. Combines a full NCAA program map with a personalized matching engine — the **GRIT FIT Formula** — that scores every eligible program against an athlete's athletic metrics, academic profile, geographic reach, and household financial data.
+**A recruiting intelligence platform for high school football student-athletes — built to surface realistic, high-value program matches based on athletic fit, academic credentials, geographic reach, and household financial data.**
+
+> **This is not a recruiting service and not a scouting service.** This tool does not connect athletes to coaches, evaluate player talent, or facilitate contact between any parties. It is a data-driven research and decision-support tool. Use it to build a realistic school list, understand your financial picture, and take direct action through recruiting questionnaire links.
+
+---
+
+## The Problem This Solves
+
+The conventional wisdom in college football recruiting drives most families toward a single outcome: a Division I scholarship offer. This is what we call the **Golden Opportunity** — real for a small number of elite athletes, but statistically unavailable for the vast majority of talented student-athletes. Families spend years optimizing for scholarship dollars and division labels while overlooking something far more durable: the long-term institutional value of the degree itself.
+
+The **Platinum Opportunity** is GrittyOS's reframe. A student-athlete who attends a highly selective institution — even without a full scholarship, even in Division III or FCS — often emerges with greater career earnings, stronger alumni networks, and better long-term outcomes than a peer who waited years for a D1 offer to a less selective school. The **ADLTV (Adjusted Degree Lifetime Value)** metric embedded across this platform is designed to make that argument visible and quantifiable across all 661 NCAA football programs.
+
+The Platinum Opportunity is not a consolation prize. In many cases, it is the better deal.
+
+---
+
+## Who This Is For
+
+### Student-Athletes & Families
+- Run the GRIT FIT Formula to get a personalized list of programs where you are a realistic fit athletically, academically, and geographically
+- See your projected net cost and degree ROI for every matched school when household financial data is provided
+- Access recruiting questionnaires and coaching staff directories directly from every program card
+- Browse all 661 programs on a filterable map to research schools you may never have considered
+
+### High School Coaches
+- Surface realistic fits for players across the full spectrum of ability and academic profile
+- Use the ADLTV rank filter to identify high-value programs regardless of division label
+- Access recruiting questionnaire links directly from any program card
+
+### College Football Coaches
+- Understand the competitive landscape by division, conference, selectivity, and financial profile
+- See how your program's ADLTV rank and admissions tier compare to peers across the country
 
 ---
 
 ## Platform Modes
 
 ### Browse Schools
-An interactive map of all 661 NCAA football programs across every division. Markers are color-coded by division tier. Click any school to view a details card showing conference, admissions selectivity, ADLTV, ADLTV Rank, admission rate, graduation rate, cost of attendance, and estimated average merit aid. Filter the map by division tier, admissions selectivity, conference, ADLTV rank, state, or school name.
+An interactive map of all 661 NCAA football programs. Markers are color-coded by division tier. Click any school to view a details card showing conference, admissions selectivity, ADLTV, ADLTV Rank, admission rate, graduation rate, cost of attendance, and estimated average merit aid. Filter the map by division tier, admissions selectivity, conference, ADLTV rank, state, or school name.
 
 ### My Quick List
-Enter an athlete profile to run the GRIT FIT Formula. Every program is scored and ranked. The top 50 matches are displayed on the map and in a sortable results table. Three personal score metrics appear in the dashboard above the table.
+Enter an athlete profile to run the GRIT FIT Formula. Every program is scored and ranked. The top 50 matches are displayed on the map and in a sortable results table. Three personal score metrics appear in the dashboard above the table. Provide household AGI and dependents to unlock net cost and ROI projections for every matched school.
 
 ---
 
 ## The GRIT FIT Formula
 
-The formula filters and ranks programs across five sequential gates:
+The formula filters and ranks programs across three sequential gates:
 
 ### Gate 1 — Athletic Tier Match
-The athlete's position metrics (height, weight, 40-yard dash) are scored against the median standards at each division tier using a normal distribution (matching `NORM.DIST` in Google Sheets). Award bonuses are added on top: Expected Starter (+5%), Captain (+5%), All-Conference (+10%), All-State (+15%). The athlete is assigned to the highest tier where their boosted score exceeds 50%.
+The athlete's position metrics (height, weight, 40-yard dash) are scored against the median standards at each division tier using a normal distribution (matching `NORM.DIST` in Google Sheets). Award bonuses are applied on top: Expected Starter (+5%), Captain (+5%), All-Conference (+10%), All-State (+15%). The athlete is assigned to the highest tier where their boosted score exceeds 50%.
 
 **Tiers:** Power 4 · G6 · FCS · Division II · Division III
 
@@ -65,7 +96,14 @@ Three personal scores appear above the results table after running My Quick List
 
 ## Financial Data
 
-Financial columns appear in the results table when AGI and number of dependents are entered in the athlete profile. All calculations are modeled after the GrittyOS DB formula sheet.
+Financial columns unlock when AGI and number of dependents are entered in the athlete profile. All calculations are modeled after the GrittyOS DB formula sheet.
+
+### ADLTV — Adjusted Degree Lifetime Value
+GrittyOS's core proprietary metric. Estimates the lifetime earnings premium associated with each institution's degree, adjusted downward by the school's graduation rate:
+```
+ADLTV = DLTV x Graduation Rate
+```
+A school with strong earnings outcomes but a low graduation rate is penalized — the adjustment reflects the realistic probability of actually capturing that value. This metric is the engine behind the Platinum Opportunity thesis: it cuts across division labels to reveal which programs deliver the most durable long-term return regardless of athletic tier.
 
 ### Expected Family Contribution (EFC / SAI)
 Determined by a lookup table keyed to household AGI and number of dependents (1–4). Eligibility thresholds differ by school control type — public, private, and elite (Super Elite / Elite / Very Selective) schools each have separate aid eligibility cutoffs.
@@ -80,24 +118,17 @@ The 1.18 multiplier accounts for annual cost inflation. Merit deduction is appli
 ### Athletic Scholarship
 FBS programs (Power 4 and G6) are assumed to offer full cost-of-attendance scholarships. FCS programs are modeled at 60% COA, Division II at 30%. Ivy League and Pioneer League programs offer no athletic aid.
 
-### ADLTV — Adjusted Degree Lifetime Value
-The estimated lifetime earnings premium from graduating from this institution, adjusted downward by the school's graduation rate:
-```
-ADLTV = DLTV x Graduation Rate
-```
-A school with high earnings outcomes but a low graduation rate is penalized — the adjustment reflects the realistic probability of actually capturing that value.
-
 ### DROI — Degree Return on Investment
 ```
 DROI = ADLTV / Net Cost (4-year)
 ```
-Higher is better. Measures how much lifetime value is generated per dollar invested. A DROI of 5x means the degree is projected to return $5 in lifetime earnings premium for every $1 spent net of aid.
+Higher is better. Measures how much lifetime value is generated per dollar invested. A DROI of 5x means the degree is projected to return $5 in lifetime earnings premium for every $1 spent net of aid. This is the single most important financial signal for evaluating whether a school is genuinely worth pursuing.
 
 ### Break-Even
 ```
 Break-Even = 40 / DROI  (years)
 ```
-The estimated number of years post-graduation to fully recover the 4-year net investment based on the degree's earnings premium. A shorter break-even means faster financial payback.
+The estimated number of years post-graduation to fully recover the 4-year net investment. A shorter break-even means faster financial payback and lower long-term risk.
 
 ---
 
@@ -126,8 +157,8 @@ The estimated number of years post-graduation to fully recover the 4-year net in
 
 - **Frontend:** React + Vite
 - **Map:** Leaflet + leaflet.markercluster
-- **Backend:** Google Apps Script Web App (read/write to GrittyOS DB Google Sheet)
-- **Data:** GrittyOS DB — 661 NCAA football programs with academic, financial, athletic, and recruiting data
+- **Backend:** Google Apps Script Web App (read/write to GrittyOS Master DB Google Sheet)
+- **Data:** GrittyOS Master DB — 661 NCAA football programs with academic, financial, athletic, and recruiting data
 
 ## Setup
 
@@ -138,3 +169,30 @@ The estimated number of years post-graduation to fully recover the 4-year net in
    ```
 3. Place `helmet.png` in `/public/`
 4. `npm install && npm run dev`
+
+---
+
+## Data Sources
+
+| Field | Source |
+|---|---|
+| Division, Conference | NCAA / GrittyOS internal database |
+| Admission Rate, Graduation Rate, COA | IPEDS (Integrated Postsecondary Education Data System) |
+| Geographic Coordinates | IPEDS institution coordinates |
+| ADLTV, ADLTV Rank | GrittyOS proprietary model |
+| Merit Aid | IPEDS institutional grant aid averages |
+| Recruiting Questionnaire URLs | Manually collected from athletic department websites |
+| Academic Selectivity Tier | GrittyOS classification derived from IPEDS admission rates |
+| Athletic Standards (h/w/speed) | GrittyOS position standards database by division tier |
+
+---
+
+## About GrittyOS
+
+GrittyOS is a college football recruiting advisory consortium and open-source platform that helps student-athletes and families navigate selective colleges offering partial or no athletic scholarships. We use data analysis, financial modeling, and recruiting strategy to identify market inefficiencies in college admissions and athletic recruiting — and help families capitalize on them.
+
+**[https://www.skool.com/verify-grit-2176](https://www.skool.com/verify-grit-2176)** | Built by [Chris Conroy](https://beacons.ai/coachconroy)
+
+---
+
+*661 programs · FBS through Division III · All 50 states · Updated March 2026*
