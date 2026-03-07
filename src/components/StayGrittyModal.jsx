@@ -393,7 +393,7 @@ export default function StayGrittyModal({ results, athlete, onEditProfile, onBro
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
                 <thead>
                   <tr style={{ background: "#0a120b" }}>
-                    {["School", "State", "ADLTV", "Dist (mi)"].map(h => (
+                    {["School", "State", "ADLTV", "ADLTV Rank", "Dist (mi)"].map(h => (
                       <th key={h} style={{
                         padding: "6px 10px", textAlign: "left", color: "#6b8c72",
                         fontFamily: "'Barlow Condensed', sans-serif", fontSize: 10,
@@ -410,6 +410,9 @@ export default function StayGrittyModal({ results, athlete, onEditProfile, onBro
                       <td style={{ padding: "6px 10px", color: "#6b8c72" }}>{s.State}</td>
                       <td style={{ padding: "6px 10px", color: "#6b8c72" }}>
                         {s.adltv ? `$${Math.round(s.adltv).toLocaleString()}` : "—"}
+                      </td>
+                      <td style={{ padding: "6px 10px", color: "#6b8c72" }}>
+                        {s["ADLTV Rank"] ? `#${s["ADLTV Rank"]}` : "—"}
                       </td>
                       <td style={{ padding: "6px 10px", color: "#6b8c72" }}>
                         {s.dist !== 9999 ? s.dist?.toLocaleString() : "—"}
