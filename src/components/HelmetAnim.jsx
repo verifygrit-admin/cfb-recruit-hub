@@ -58,7 +58,7 @@ export default function HelmetAnim({ targetId, onDone }) {
 
   return (
     <div ref={elRef} className="helmet-anim" aria-hidden="true">
-      <img src="/helmet.png" alt="" draggable="false" />
+      <img src={`${import.meta.env.BASE_URL}helmet.png`} alt="" draggable="false" />
     </div>
   );
 }
