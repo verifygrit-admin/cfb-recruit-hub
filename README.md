@@ -41,7 +41,11 @@ The Platinum Opportunity is not a consolation prize. In many cases, it is the be
 An interactive map of all 661 NCAA football programs. Markers are color-coded by division tier. Click any school to view a details card showing conference, admissions selectivity, ADLTV, ADLTV Rank, admission rate, graduation rate, cost of attendance, and estimated average merit aid. Filter the map by division tier, admissions selectivity, conference, ADLTV rank, state, or school name.
 
 ### My Quick List
-Enter an athlete profile to run the GRIT FIT Formula. Every program is scored and ranked. The top 50 matches are displayed on the map and in a sortable results table. Three personal score metrics appear in the dashboard above the table. Provide household AGI and dependents to unlock net cost and ROI projections for every matched school.
+Enter a Student-Athlete Profile to run the GRIT FIT Formula. The form collects identity (name, high school, state, graduation year, email, phone, Twitter/X), athletic measurables (position, height, weight, 40-yard dash), academic credentials (GPA, PSAT/SAT), optional household financial data (AGI, dependents), and athletic awards. High school location is geocoded automatically using the school name and state to calculate precise recruiting reach distances.
+
+Every program is scored and ranked. The top 50 matches are displayed on the map and in a sortable results table. Three personal score metrics appear in the dashboard above the table. Provide household AGI and dependents to unlock net cost and ROI projections for every matched school.
+
+Submitted profiles are assigned a unique **Student-Athlete ID (SAID)** in the format `GRIT-[Year]-[NNNN]` and saved to the GrittyOS Master DB. Re-submitting an edited profile updates the existing record. Use **New Profile** to start fresh with a new SAID — treated as a distinct athlete entry.
 
 ---
 
@@ -157,7 +161,7 @@ The estimated number of years post-graduation to fully recover the 4-year net in
 
 - **Frontend:** React + Vite
 - **Map:** Leaflet + leaflet.markercluster
-- **Backend:** Google Apps Script Web App (read/write to GrittyOS Master DB Google Sheet)
+- **Backend:** Google Apps Script Web App (reads school data from GrittyOS Master DB; writes recruit profiles to a dedicated Recruits tab with auto-generated SAIDs and server-side timestamps; supports insert and update operations)
 - **Data:** GrittyOS Master DB — 661 NCAA football programs with academic, financial, athletic, and recruiting data
 
 ## Setup
@@ -169,6 +173,8 @@ The estimated number of years post-graduation to fully recover the 4-year net in
    ```
 3. Place `helmet.png` in `/public/`
 4. `npm install && npm run dev`
+
+> The **Recruits** tab in the connected Google Sheet is created automatically on the first profile submission. No manual sheet setup required. To reset recruit data, rename the existing tab (e.g. `Recruits_Archive`) and the script will create a fresh tab on the next submission.
 
 ---
 
