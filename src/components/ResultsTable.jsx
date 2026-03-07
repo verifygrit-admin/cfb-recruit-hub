@@ -105,7 +105,7 @@ function LinkTH({ label, desc, tooltip, setTooltip }) {
   );
 }
 
-export default function ResultsTable({ results, name }) {
+export default function ResultsTable({ results, name, shortList = [], onToggleShortList }) {
   const [sort, setSort]   = useState({ col: "matchRank", asc: true });
   const [tooltip, setTooltip] = useState(null); // { text, x, y }
 
@@ -169,6 +169,9 @@ export default function ResultsTable({ results, name }) {
                     sort={sort} onSort={onSort}
                     tooltip={tooltip} setTooltip={setTooltip} />
               ))}
+              <LinkTH label="Short List"
+                desc="Add this school to My Short List for side-by-side comparison and CRM tracking."
+                tooltip={tooltip} setTooltip={setTooltip} />
               <LinkTH label="Recruit Quest."
                 desc="Submit your recruiting questionnaire directly to this program's coaching staff."
                 tooltip={tooltip} setTooltip={setTooltip} />
@@ -194,6 +197,20 @@ export default function ResultsTable({ results, name }) {
                       {c.fmt(s[c.col])}
                     </td>
                   ))}
+                  <td style={{ padding: "7px 10px", textAlign: "center" }}>
+                    {onToggleShortList && (() => {
+                      const inList = shortList.some(sl => String(sl.UNITID) === String(s.UNITID));
+                      return (
+                        <button
+                          className={`sl-toggle-btn${inList ? " sl-toggle-btn--added" : ""}`}
+                          onClick={() => onToggleShortList(s.UNITID)}
+                          title={inList ? "Remove from Short List" : "Add to Short List"}
+                        >
+                          {inList ? "✓" : "+"}
+                        </button>
+                      );
+                    })()}
+                  </td>
                   <td style={{ padding: "7px 10px", whiteSpace: "nowrap" }}>
                     {s._qLink
                       ? <a href={s._qLink} target="_blank" rel="noreferrer" className="table-link">Q &rarr;</a>

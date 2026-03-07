@@ -3,11 +3,12 @@ import ModeToggle from "./components/ModeToggle.jsx";
 import MapView from "./components/MapView.jsx";
 import QuickListForm from "./components/QuickListForm.jsx";
 import ResultsTable from "./components/ResultsTable.jsx";
+import ShortList from "./components/ShortList.jsx";
 import Sidebar from "./components/Sidebar.jsx";
 import Tutorial from "./components/Tutorial.jsx";
 import HelmetAnim from "./components/HelmetAnim.jsx";
 import StayGrittyModal from "./components/StayGrittyModal.jsx";
-import { fetchSchools, fetchTracker, saveRecruit, updateRecruit, geocodeHighSchool } from "./lib/api.js";
+import { fetchSchools, fetchTracker, saveRecruit, updateRecruit, geocodeHighSchool, saveShortList } from "./lib/api.js";
 import { runQuickList, getClassLabel } from "./lib/scoring.js";
 
 const BLANK_ATHLETE = {
@@ -46,6 +47,7 @@ export default function App() {
   const [said, setSaid]                     = useState(null);   // SAID of last saved profile
   const [savedIdentity, setSavedIdentity]   = useState(null);   // { name, email } at save time
   const [stayGrittyData, setStayGrittyData] = useState(null);   // results when topTier === null
+  const [shortList, setShortList]           = useState([]);     // My Short List schools
   const browseAnimShown = useRef(false);
   const qlAnimShown     = useRef(false);
 
@@ -54,6 +56,15 @@ export default function App() {
       .then(s => { setSchools(s); setDataLoaded(true); })
       .catch(e => setDataError(e.message));
     fetchTracker().then(setTracker).catch(() => {});
+    // Restore SAID + short list from localStorage on mount
+    const savedSaid = localStorage.getItem("cfb_said");
+    if (savedSaid) {
+      setSaid(savedSaid);
+      try {
+        const sl = localStorage.getItem(`cfb_sl_${savedSaid}`);
+        if (sl) setShortList(JSON.parse(sl));
+      } catch {}
+    }
     // Show browse helmet animation on first load
     if (!browseAnimShown.current) {
       browseAnimShown.current = true;
@@ -68,6 +79,45 @@ export default function App() {
       setShowQLAnim(true);
     }
   }, [results]);
+
+  // Persist SAID + short list to localStorage; debounce Sheet sync
+  useEffect(() => {
+    if (!said) return;
+    localStorage.setItem("cfb_said", said);
+    localStorage.setItem(`cfb_sl_${said}`, JSON.stringify(shortList));
+    const timer = setTimeout(() => {
+      saveShortList(said, shortList).catch(() => {});
+    }, 2000);
+    return () => clearTimeout(timer);
+  }, [shortList, said]);
+
+  // Register window handlers so Leaflet popup buttons can call React state
+  useEffect(() => {
+    window.__shortListIds = shortList.map(s => String(s.UNITID));
+    window.__toggleShortList = (unitid) => {
+      const uid = String(unitid);
+      setShortList(sl => {
+        if (sl.some(s => String(s.UNITID) === uid)) {
+          return sl.filter(s => String(s.UNITID) !== uid);
+        }
+        if (sl.length >= 40) {
+          alert("Your Short List is full (max 40 schools). Remove a school to add another.");
+          return sl;
+        }
+        // Find school from results.scored first, then raw schools list
+        const scored  = results?.scored?.find(s => String(s.UNITID) === uid);
+        const rawSch  = schools.find(s => String(s.UNITID) === uid);
+        const base    = scored || rawSch;
+        if (!base) return sl;
+        return [...sl, {
+          ...base,
+          crm_contacted: false, crm_applied: false,
+          crm_offer: false,     crm_committed: false,
+          addedAt: new Date().toISOString(),
+        }];
+      });
+    };
+  }, [shortList, results, schools]);
 
   // Auto-geocode when highSchool + state both have values
   useEffect(() => {
@@ -193,10 +243,45 @@ export default function App() {
     setSavedIdentity(null);
     setResults(null);
     setAthlete(BLANK_ATHLETE);
+    setShortList([]);
+    localStorage.removeItem("cfb_said");
     setMode("quicklist");
   }
 
-  const isBrowse = mode === "browse";
+  function handleToggleShortList(unitid) {
+    const uid = String(unitid);
+    setShortList(sl => {
+      if (sl.some(s => String(s.UNITID) === uid)) {
+        return sl.filter(s => String(s.UNITID) !== uid);
+      }
+      if (sl.length >= 40) return sl;
+      const scored = results?.scored?.find(s => String(s.UNITID) === uid);
+      const raw    = schools.find(s => String(s.UNITID) === uid);
+      const base   = scored || raw;
+      if (!base) return sl;
+      return [...sl, {
+        ...base,
+        crm_contacted: false, crm_applied: false,
+        crm_offer: false,     crm_committed: false,
+        addedAt: new Date().toISOString(),
+      }];
+    });
+  }
+
+  function handleRemoveFromShortList(unitid) {
+    setShortList(sl => sl.filter(s => String(s.UNITID) !== String(unitid)));
+  }
+
+  function handleCRMChange(unitid, field, value) {
+    setShortList(sl => sl.map(s => String(s.UNITID) === String(unitid) ? { ...s, [field]: value } : s));
+  }
+
+  function handleReorderShortList(newOrder) {
+    setShortList(newOrder);
+  }
+
+  const isBrowse    = mode === "browse";
+  const isShortList = mode === "shortlist";
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
@@ -224,7 +309,7 @@ export default function App() {
           {isBrowse && (
             <button id="tutHelpBtn" className="help-btn" onClick={() => { setTutorialType("browse"); setShowTutorial(true); }} aria-label="Help">?</button>
           )}
-          {!isBrowse && (
+          {mode === "quicklist" && (
             <button id="qlHelpBtn" className="help-btn" onClick={() => { setTutorialType("quicklist"); setShowTutorial(true); }} aria-label="My GRIT Fit Help">?</button>
           )}
         </div>
@@ -251,10 +336,21 @@ export default function App() {
 
         {/* Main content */}
         <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-          {isBrowse ? (
+          {isShortList ? (
+            <div style={{ flex: 1, overflowY: "auto" }}>
+              <ShortList
+                shortList={shortList}
+                said={said}
+                onReorder={handleReorderShortList}
+                onRemove={handleRemoveFromShortList}
+                onCRMChange={handleCRMChange}
+                onGoToGritFit={() => setMode("quicklist")}
+              />
+            </div>
+          ) : isBrowse ? (
             <div style={{ flex: 1 }}>
               {dataLoaded
-                ? <MapView schools={schools} results={null} mode="browse" filters={filters} />
+                ? <MapView schools={schools} results={null} mode="browse" filters={filters} shortListIds={shortList.map(s => String(s.UNITID))} />
                 : <div className="loading-screen">Loading School Data…</div>}
             </div>
           ) : (
@@ -262,7 +358,7 @@ export default function App() {
               <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
                 {panel === "map" ? (
                   <div style={{ flex: 1, position: "relative" }}>
-                    <MapView schools={schools} results={results} mode="quicklist" filters={null} />
+                    <MapView schools={schools} results={results} mode="quicklist" filters={null} shortListIds={shortList.map(s => String(s.UNITID))} />
                     {showResultsModal && (
                       <div style={{
                         position: "absolute", inset: 0, zIndex: 1000,
@@ -304,7 +400,12 @@ export default function App() {
                   </div>
                 ) : (
                   <div style={{ flex: 1, overflowY: "auto" }}>
-                    <ResultsTable results={results} name={athlete.name} />
+                    <ResultsTable
+                      results={results}
+                      name={athlete.name}
+                      shortList={shortList}
+                      onToggleShortList={handleToggleShortList}
+                    />
                   </div>
                 )}
                 <div className="summary-bar">

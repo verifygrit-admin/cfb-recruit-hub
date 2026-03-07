@@ -12,8 +12,9 @@ const RECRUITS_TAB_NAME   = "Recruits";      // where recruit profiles are saved
 function doGet(e) {
   const action = e.parameter.action || "db";
   try {
-    if (action === "db")      return jsonResponse(getDB());
-    if (action === "tracker") return jsonResponse(getTracker());
+    if (action === "db")           return jsonResponse(getDB());
+    if (action === "tracker")      return jsonResponse(getTracker());
+    if (action === "getShortList") return jsonResponse(getShortList(e.parameter.said));
     return jsonResponse({ error: "Unknown action" });
   } catch (err) {
     return jsonResponse({ error: err.message });
@@ -30,6 +31,10 @@ function doPost(e) {
     if (action === "updateRecruit") {
       const profile = JSON.parse(e.postData.contents);
       return jsonResponse(updateRecruit(profile));
+    }
+    if (action === "saveShortList") {
+      const payload = JSON.parse(e.postData.contents);
+      return jsonResponse(saveShortList(payload));
     }
     return jsonResponse({ error: "Unknown action" });
   } catch (err) {
@@ -186,6 +191,66 @@ function updateRecruit(profile) {
 
   // SAID not found — fall back to insert
   return saveRecruit(profile);
+}
+
+function getShortList(said) {
+  if (!said) return { schools: [] };
+  const ss    = SpreadsheetApp.openById(GRITTY_DB_SHEET_ID);
+  const sheet = ss.getSheetByName("SL-" + said);
+  if (!sheet) return { schools: [] };
+  const [headers, ...rows] = sheet.getDataRange().getValues();
+  const schools = rows.filter(r => r[0]).map(r => {
+    const obj = {};
+    headers.forEach((h, i) => { if (h) obj[h] = r[i]; });
+    return obj;
+  });
+  return { schools };
+}
+
+function saveShortList(payload) {
+  const { said, schools } = payload;
+  if (!said) return { error: "No SAID provided" };
+  const ss      = SpreadsheetApp.openById(GRITTY_DB_SHEET_ID);
+  const tabName = "SL-" + said;
+  let sheet     = ss.getSheetByName(tabName);
+  if (!sheet) {
+    sheet = ss.insertSheet(tabName);
+  } else {
+    sheet.clearContents();
+  }
+  const headers = [
+    "unitid","schoolName","div","conference","state","dist",
+    "netCost","droi","breakEven","adltv","gradRate","coa",
+    "matchRank","matchTier","qLink","coachLink",
+    "crm_contacted","crm_applied","crm_offer","crm_committed","addedAt",
+  ];
+  sheet.appendRow(headers);
+  (schools || []).forEach(s => {
+    sheet.appendRow([
+      s.UNITID        || "",
+      s._schoolName   || "",
+      s._divLabel     || "",
+      s.Conference    || "",
+      s.State         || "",
+      s.dist          != null ? s.dist      : "",
+      s.netCost       != null ? s.netCost   : "",
+      s.droi          != null ? s.droi      : "",
+      s.breakEven     != null ? s.breakEven : "",
+      s.adltv         != null ? s.adltv     : "",
+      s.gradRate      != null ? s.gradRate  : "",
+      s._coaNum       || "",
+      s.matchRank     || "",
+      s.matchTier     || "",
+      s._qLink        || "",
+      s._coachLink    || "",
+      s.crm_contacted  ? "TRUE" : "",
+      s.crm_applied    ? "TRUE" : "",
+      s.crm_offer      ? "TRUE" : "",
+      s.crm_committed  ? "TRUE" : "",
+      s.addedAt        || new Date().toISOString(),
+    ]);
+  });
+  return { ok: true };
 }
 
 // ── HELPERS ────────────────────────────────────────────────────────────────────

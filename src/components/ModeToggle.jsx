@@ -3,7 +3,8 @@ export default function ModeToggle({ mode, onChange }) {
     <div className="mode-toggle">
       {[
         { id: "browse",    label: "Browse Schools" },
-        { id: "quicklist", label: "My GRIT Fit" },
+        { id: "quicklist", label: "My GRIT Fit"    },
+        { id: "shortlist", label: "My Short List"  },
       ].map(({ id, label }) => (
         <button
           key={id}

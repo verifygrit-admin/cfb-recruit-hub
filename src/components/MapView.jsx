@@ -21,7 +21,7 @@ function makeIcon(color, size = 10) {
   });
 }
 
-export default function MapView({ schools, results, mode, filters }) {
+export default function MapView({ schools, results, mode, filters, shortListIds = [] }) {
   const mapRef    = useRef(null);
   const leafletRef = useRef(null);
   const clusterRef = useRef(null);
@@ -40,7 +40,7 @@ export default function MapView({ schools, results, mode, filters }) {
     }).addTo(leafletRef.current);
   }, []);
 
-  // Re-render markers when schools, results, or filters change
+  // Re-render markers when schools, results, filters, or shortListIds change
   useEffect(() => {
     const map = leafletRef.current;
     if (!map || !schools.length) return;
@@ -202,6 +202,16 @@ export default function MapView({ schools, results, mode, filters }) {
         popupContent += `</div>`;
       }
 
+      const inList = shortListIds.map(String).includes(String(school.UNITID));
+      popupContent += `
+        <div style="padding:8px 14px 14px">
+          <button
+            onclick="window.__toggleShortList('${school.UNITID}')"
+            class="popup-sl-btn${inList ? " popup-sl-btn--added" : ""}"
+          >${inList ? "✓ In Short List" : "+ Add to Short List"}</button>
+        </div>
+      `;
+
       popupContent += `</div>`;
 
       const marker = L.marker([lat, lng], { icon: makeIcon(color, size) });
@@ -211,7 +221,7 @@ export default function MapView({ schools, results, mode, filters }) {
 
     cluster.addTo(map);
     clusterRef.current = cluster;
-  }, [schools, results, mode, filters]);
+  }, [schools, results, mode, filters, shortListIds]);
 
   return (
     <div style={{ position: "relative", width: "100%", height: "100%" }}>

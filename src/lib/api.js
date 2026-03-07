@@ -72,3 +72,20 @@ export async function updateRecruit(profile) {
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
 }
+
+export async function saveShortList(said, schools) {
+  if (!API_BASE || !said) return;
+  const res = await fetch(`${API_BASE}?action=saveShortList`, {
+    method: "POST",
+    body: JSON.stringify({ said, schools }),
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+export async function getShortList(said) {
+  if (!API_BASE || !said) return { schools: [] };
+  const res = await fetch(`${API_BASE}?action=getShortList&said=${encodeURIComponent(said)}`);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
