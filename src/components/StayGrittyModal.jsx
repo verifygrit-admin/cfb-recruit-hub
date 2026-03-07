@@ -8,6 +8,28 @@ const TIER_LABELS = {
 
 const METRIC_LABELS = { hScore: "Height", wScore: "Weight", sScore: "40-Yard Dash" };
 
+// WOW threshold — any metric score at or above this percentile earns a callout
+const WOW_THRESHOLD = 0.75;
+
+const WOW_CALLOUTS = {
+  hScore: {
+    label: "Height",
+    coachValue: "Height is one of the first things coaches evaluate at your position. Standing above the positional median signals natural physical upside that can't be developed in a weight room — and it separates your profile from the crowd before you ever step on a field.",
+  },
+  wScore: {
+    label: "Playing Weight",
+    coachValue: "Playing at or above the positional weight median signals physical readiness and the ability to compete from day one. Coaches don't want to wait years for a recruit to develop the frame to handle contact. Your weight tells them you're ready now.",
+  },
+  sScore: {
+    label: "40-Yard Speed",
+    coachValue: "Elite speed is one of the rarest and most coveted traits in college football recruiting. Coaches can develop strength and technique — they cannot coach speed. A top-tier 40 time travels fast through recruiting networks and is the single most attention-grabbing number on a recruiting profile.",
+  },
+  acadRigorScore: {
+    label: "Academic Profile",
+    coachValue: "Academic strength directly affects a program's ability to admit you. Coaches don't just want talent — they need recruits who clear the admissions bar and stay eligible. A strong academic profile gives a coach confidence that offering you won't fall apart in the admissions office.",
+  },
+};
+
 // Position suggestion pools — only suggest analogous roles by position group
 const OFF_SKILL = ["QB", "RB", "FB", "WR"];
 const OFF_LINE  = ["OL", "C", "G", "T"];
@@ -216,6 +238,14 @@ export default function StayGrittyModal({ results, athlete, onEditProfile, onBro
   if (comps?.hScore > 0.5) strengths.push(`Height: ${(comps.hScore * 100).toFixed(0)}%`);
   if (comps?.wScore > 0.5) strengths.push(`Weight: ${(comps.wScore * 100).toFixed(0)}%`);
 
+  // WOW scores — any metric at or above the 75th percentile
+  const wowItems = [];
+  if (results.acadRigorScore >= WOW_THRESHOLD)
+    wowItems.push({ key: "acadRigorScore", score: results.acadRigorScore });
+  if (comps?.sScore >= WOW_THRESHOLD) wowItems.push({ key: "sScore", score: comps.sScore });
+  if (comps?.hScore >= WOW_THRESHOLD) wowItems.push({ key: "hScore", score: comps.hScore });
+  if (comps?.wScore >= WOW_THRESHOLD) wowItems.push({ key: "wScore", score: comps.wScore });
+
   // Alternative positions at D3 — filtered to analogous position group
   const boost = results.boost || 0;
   const pool = SUGGESTION_POOLS[athlete.position] || [];
@@ -280,6 +310,39 @@ export default function StayGrittyModal({ results, athlete, onEditProfile, onBro
                 }}>{s}</span>
               ))}
             </div>
+          </div>
+        )}
+
+        {/* WOW callouts — metrics at or above 75th percentile */}
+        {wowItems.length > 0 && (
+          <div style={{ marginBottom: 20 }}>
+            {wowItems.map(({ key, score }) => {
+              const callout = WOW_CALLOUTS[key];
+              if (!callout) return null;
+              const pct = Math.round(score * 100);
+              return (
+                <div key={key} style={{
+                  marginBottom: 10, padding: "14px 16px",
+                  background: "linear-gradient(135deg, #0e1f10 0%, #0a1a0c 100%)",
+                  border: "1px solid #6ed430", borderRadius: 4,
+                }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
+                    <span style={{ fontSize: 20 }}>🔥</span>
+                    <span style={{ fontSize: 18, fontWeight: 700, color: "#6ed430", letterSpacing: 1 }}>WOW!</span>
+                    <span style={{ fontSize: 12, color: "#c8f5a0", fontFamily: "'Barlow Condensed', sans-serif", letterSpacing: 1 }}>
+                      {callout.label}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "#c8f5a0", marginBottom: 6, fontFamily: "'Barlow Condensed', sans-serif", letterSpacing: 0.5 }}>
+                    You're performing better than {pct}% of student-athletes in this area.
+                  </div>
+                  <div style={{ fontSize: 12, color: "#6b8c72", fontFamily: "'Barlow', sans-serif", lineHeight: 1.6 }}>
+                    {callout.coachValue}{" "}
+                    <strong style={{ color: "#c8f5a0" }}>Lock in your Stay Gritty Focus and this becomes a headline on your recruiting profile.</strong>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
 
