@@ -63,8 +63,8 @@ const BROWSE_SLIDES = [
   },
   {
     num: "04 / 04",
-    title: "My Quick List",
-    body: "Switch to MY QUICK LIST in the top-right to enter your athlete profile. The GRIT FIT Formula scores every program against your athletic metrics, academic scores, location, and financial data.",
+    title: "My GRIT Fit",
+    body: "Switch to MY GRIT FIT in the top-right to enter your athlete profile. The GRIT FIT Formula scores every program against your athletic metrics, academic scores, location, and financial data.",
     extra: (
       <ul className="tut-list">
         <li>Green markers = Top Match (ranks 1–30)</li>
@@ -80,7 +80,7 @@ const BROWSE_SLIDES = [
 const QL_SLIDES = [
   {
     num: "01 / 05",
-    title: "What is My Quick List?",
+    title: "What is My GRIT Fit?",
     body: "The GRIT FIT Formula evaluates every NCAA program against your personal profile — athletic metrics, academics, location, and household finances — to surface your best realistic matches.",
     extra: (
       <div className="tut-defs">

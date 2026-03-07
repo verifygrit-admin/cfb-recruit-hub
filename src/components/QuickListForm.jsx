@@ -51,7 +51,7 @@ export default function QuickListForm({ athlete, onChange, onAwardChange, onSubm
       {FORM_SECTIONS.map(sec => (
         <div key={sec.title} style={{ marginBottom: 28 }}>
           <div className="form-section-head">{sec.title}</div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12 }}>
+          <div className="form-grid">
             {sec.fields.map(f => (
               <div key={f.key} className="form-field" style={f.key === "sat" ? { gridColumn: "1 / span 2" } : {}}>
                 <label style={{ display: "flex", alignItems: "center", gap: 5 }}>
@@ -155,7 +155,7 @@ export default function QuickListForm({ athlete, onChange, onAwardChange, onSubm
 
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
         <button className="form-submit" onClick={() => onSubmit(false)} disabled={loading} style={{ flex: 1 }}>
-          {loading ? "Running GRIT FIT Formula…" : hasSaid ? "Update My Quick List →" : "Generate My Quick List →"}
+          {loading ? "Running GRIT FIT Formula…" : hasSaid ? "Update My GRIT Fit →" : "Generate My GRIT Fit →"}
         </button>
         {hasSaid && (
           <button

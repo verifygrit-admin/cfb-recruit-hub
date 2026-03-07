@@ -243,6 +243,7 @@ select:focus { outline: none; border-color: var(--accent); }
 
 /* ── QUICK LIST FORM ───────────────────────────────────────────────── */
 .form-wrapper { max-width: 860px; margin: 0 auto; padding: 32px 24px; }
+.form-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
 .form-title { font-family: 'Barlow Condensed', sans-serif; font-size: 26px; font-weight: 700; letter-spacing: 1px; color: var(--text); margin-bottom: 6px; }
 .form-subtitle { font-family: 'Barlow', sans-serif; font-size: 13px; color: var(--muted); margin-bottom: 28px; }
 .form-section-head { font-family: 'Barlow Condensed', sans-serif; font-size: 11px; font-weight: 600; letter-spacing: 2px; color: var(--accent); margin-bottom: 12px; border-bottom: 1px solid var(--border); padding-bottom: 8px; text-transform: uppercase; }
@@ -592,9 +593,17 @@ select:focus { outline: none; border-color: var(--accent); }
   .col-tooltip { width: 160px; font-size: 10px; }
   .results-table { font-size: 12px; }
   .table-th { padding: 6px 8px; font-size: 10px; }
+  /* Form: 2 columns on tablet/mobile */
+  .form-grid { grid-template-columns: repeat(2, 1fr); }
+  /* Summary bar: wrap so buttons stay visible */
+  .summary-bar { flex-wrap: wrap; gap: 10px; }
 }
 @media (max-width: 480px) {
   .header-divider { display: none; }
   .ql-metric { min-width: 100%; }
   .mode-btn { padding: 6px 8px; font-size: 10px; letter-spacing: 0.5px; }
+  /* Form: single column on small phones */
+  .form-grid { grid-template-columns: 1fr; }
+  /* Summary bar stats: tighten on small screens */
+  .summary-bar { gap: 8px; padding: 8px 12px; }
 }
