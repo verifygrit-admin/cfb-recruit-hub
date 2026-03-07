@@ -8,7 +8,7 @@ import Tutorial from "./components/Tutorial.jsx";
 import HelmetAnim from "./components/HelmetAnim.jsx";
 import StayGrittyModal from "./components/StayGrittyModal.jsx";
 import { fetchSchools, fetchTracker, saveRecruit, updateRecruit, geocodeHighSchool } from "./lib/api.js";
-import { runQuickList } from "./lib/scoring.js";
+import { runQuickList, getClassLabel } from "./lib/scoring.js";
 
 const BLANK_ATHLETE = {
   name: "", highSchool: "", gradYear: "", email: "", phone: "", twitter: "",
@@ -142,6 +142,16 @@ export default function App() {
         agi: athlete.agi ? +athlete.agi : null,
         dependents: athlete.dependents ? (athlete.dependents === "4+" ? 4 : +athlete.dependents) : null,
       };
+      // GPA eligibility check — minimum thresholds by class year
+      const GPA_MIN = { Senior: 2.5, Junior: 2.4, Soph: 2.3, Freshman: 2.2 };
+      const classLabel = getClassLabel(parsed.gradYear);
+      const requiredGpa = GPA_MIN[classLabel] ?? 2.2;
+      if (parsed.gpa !== null && parsed.gpa < requiredGpa) {
+        setStayGrittyData({ reason: "academic", requiredGpa, classLabel });
+        saveRecruit({ ...parsed, timestamp: new Date().toISOString() }).catch(() => {});
+        return;
+      }
+
       const res = runQuickList(parsed, schools, tracker);
 
       if (!res.topTier) {

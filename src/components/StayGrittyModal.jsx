@@ -8,7 +8,137 @@ const TIER_LABELS = {
 
 const METRIC_LABELS = { hScore: "Height", wScore: "Weight", sScore: "40-Yard Dash" };
 
+const CLASS_LABELS = { Senior: "Senior", Junior: "Junior", Soph: "Sophomore", Freshman: "Freshman" };
+
+const ACADEMIC_TIPS = [
+  { title: "Ask your teachers directly", body: "Go to each teacher and ask: \"What is the single most impactful thing I can do to improve my grade?\" Teachers respect athletes who take initiative — and they often have options that aren't advertised." },
+  { title: "Prioritize your lowest-grade classes first", body: "A point gained in a D has far more GPA impact than a point gained in a B. Focus energy where the math works in your favor." },
+  { title: "Ask about late work and extra credit", body: "Many teachers allow late or redone assignments for partial credit. Just ask. The worst they can say is no — and most say yes." },
+  { title: "Use Khan Academy (free)", body: "khanacademy.org covers math, science, and SAT prep at every level. Free, self-paced, and used by millions of students. 20 minutes a day adds up fast." },
+  { title: "Find your school's free tutoring", body: "Most schools offer peer tutoring or teacher-led help sessions at lunch or after school. Your counselor can point you to them." },
+  { title: "Study in short focused blocks", body: "30 minutes of focused, phone-free study beats 2 hours of distracted work. Remove distractions first — then open the books." },
+  { title: "Review notes within 24 hours", body: "The forgetting curve is real. Reviewing your notes the same day you take them dramatically improves retention without extra time." },
+  { title: "Talk to your school counselor", body: "Ask specifically about grade forgiveness policies, course retakes, or summer school options. Counselors can open doors you don't know exist." },
+];
+
+function AcademicContent({ results, athlete, onEditProfile, onBrowse }) {
+  const firstName = athlete.name?.split(" ")[0] || "Athlete";
+  const { requiredGpa, classLabel } = results;
+  const classDisplay = CLASS_LABELS[classLabel] || classLabel;
+  const currentGpa = athlete.gpa ? parseFloat(athlete.gpa).toFixed(2) : "—";
+  const gap = requiredGpa && athlete.gpa ? (requiredGpa - parseFloat(athlete.gpa)).toFixed(2) : null;
+
+  return (
+    <div style={{
+      position: "fixed", inset: 0, zIndex: 2000,
+      background: "rgba(6,10,7,0.92)",
+      display: "flex", alignItems: "center", justifyContent: "center",
+      padding: "24px", overflowY: "auto",
+    }}>
+      <div style={{
+        background: "#0e1510", border: "1px solid #2e6b18", borderRadius: 6,
+        padding: "32px 28px", maxWidth: 560, width: "100%",
+        fontFamily: "'Barlow Condensed', sans-serif",
+        maxHeight: "90vh", overflowY: "auto",
+      }}>
+        <div style={{ fontSize: 28, fontWeight: 700, color: "#6ed430", letterSpacing: 1, marginBottom: 6 }}>
+          Stay Gritty, {firstName}!
+        </div>
+        <div style={{ fontSize: 13, color: "#6b8c72", fontFamily: "'Barlow', sans-serif", lineHeight: 1.6, marginBottom: 20 }}>
+          The GRIT FIT Formula couldn't generate matches right now because your current GPA
+          puts you below the NCAA minimum academic eligibility threshold for a{" "}
+          <strong style={{ color: "#c8f5a0" }}>{classDisplay}</strong>.
+          This is fixable — and the steps to get there don't cost anything.
+        </div>
+
+        {/* GPA snapshot */}
+        <div style={{ marginBottom: 20, background: "#0a120b", border: "1px solid #1e2e21", borderRadius: 4, padding: "14px 16px" }}>
+          <div style={{ fontSize: 10, letterSpacing: 2, color: "#f5a623", fontWeight: 700, textTransform: "uppercase", marginBottom: 10 }}>
+            Academic Eligibility Snapshot
+          </div>
+          <div style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>
+            <div>
+              <div style={{ fontSize: 10, color: "#6b8c72", letterSpacing: 1, textTransform: "uppercase", marginBottom: 3 }}>Your GPA</div>
+              <div style={{ fontSize: 28, fontWeight: 700, color: "#ef5350", fontFamily: "'Barlow Condensed', sans-serif" }}>{currentGpa}</div>
+            </div>
+            <div>
+              <div style={{ fontSize: 10, color: "#6b8c72", letterSpacing: 1, textTransform: "uppercase", marginBottom: 3 }}>{classDisplay} Minimum</div>
+              <div style={{ fontSize: 28, fontWeight: 700, color: "#6ed430", fontFamily: "'Barlow Condensed', sans-serif" }}>{requiredGpa?.toFixed(1)}</div>
+            </div>
+            {gap && (
+              <div>
+                <div style={{ fontSize: 10, color: "#6b8c72", letterSpacing: 1, textTransform: "uppercase", marginBottom: 3 }}>Gap to Close</div>
+                <div style={{ fontSize: 28, fontWeight: 700, color: "#f5a623", fontFamily: "'Barlow Condensed', sans-serif" }}>+{gap}</div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* What this means */}
+        <div style={{ marginBottom: 20, padding: "12px 16px", background: "#130f08", border: "1px solid #3a2e10", borderRadius: 4 }}>
+          <div style={{ fontSize: 10, letterSpacing: 2, color: "#f5a623", fontWeight: 700, textTransform: "uppercase", marginBottom: 6 }}>
+            Why It Matters
+          </div>
+          <div style={{ fontSize: 13, color: "#6b8c72", fontFamily: "'Barlow', sans-serif", lineHeight: 1.6 }}>
+            The NCAA requires a minimum GPA to certify initial academic eligibility — without it,
+            no program at any level can offer you a spot on their roster. The good news: GPA is
+            one of the most improvable metrics in your profile, and the best strategies are free.
+          </div>
+        </div>
+
+        {/* Tips */}
+        <div style={{ marginBottom: 20 }}>
+          <div style={{ fontSize: 10, letterSpacing: 2, color: "#6ed430", fontWeight: 700, textTransform: "uppercase", marginBottom: 12 }}>
+            Free Strategies to Move the Needle
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {ACADEMIC_TIPS.map(tip => (
+              <div key={tip.title} style={{ paddingLeft: 12, borderLeft: "2px solid #2e6b18" }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: "#c8f5a0", marginBottom: 2, letterSpacing: 0.5 }}>{tip.title}</div>
+                <div style={{ fontSize: 12, color: "#6b8c72", fontFamily: "'Barlow', sans-serif", lineHeight: 1.5 }}>{tip.body}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Encouragement close */}
+        <div style={{ marginBottom: 20, padding: "12px 16px", background: "#0a120b", border: "1px solid #2e6b18", borderRadius: 4 }}>
+          <div style={{ fontSize: 13, color: "#6b8c72", fontFamily: "'Barlow', sans-serif", lineHeight: 1.6 }}>
+            When your GPA improves, come back and update your profile. The GRIT FIT Formula will
+            run immediately and show you every program you qualify for.
+            <strong style={{ color: "#c8f5a0" }}> One semester of focused work can change your entire recruiting picture.</strong>
+          </div>
+        </div>
+
+        {/* Support */}
+        <div style={{ fontSize: 11, color: "#3a5a3e", textAlign: "center", marginBottom: 16, fontFamily: "'Barlow', sans-serif" }}>
+          Support: <a href="mailto:verifygrit@gmail.com" style={{ color: "#3a5a3e" }}>verifygrit@gmail.com</a>
+        </div>
+
+        {/* Actions */}
+        <div style={{ display: "flex", gap: 10 }}>
+          <button onClick={onEditProfile} style={{
+            flex: 1, padding: "10px 20px", background: "#2e6b18", border: "1px solid #6ed430",
+            borderRadius: 3, color: "#c8f5a0", fontFamily: "'Barlow Condensed', sans-serif",
+            fontSize: 13, fontWeight: 700, letterSpacing: 1, cursor: "pointer",
+          }}>Update My Profile →</button>
+          <button onClick={onBrowse} style={{
+            padding: "10px 20px", background: "transparent", border: "1px solid #2e6b18",
+            borderRadius: 3, color: "#6b8c72", fontFamily: "'Barlow Condensed', sans-serif",
+            fontSize: 13, fontWeight: 700, letterSpacing: 1, cursor: "pointer",
+          }}>Browse Schools</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function StayGrittyModal({ results, athlete, onEditProfile, onBrowse }) {
+  // Route to academic content if triggered by GPA threshold
+  if (results.reason === "academic") {
+    return <AcademicContent results={results} athlete={athlete} onEditProfile={onEditProfile} onBrowse={onBrowse} />;
+  }
+
   const firstName = athlete.name?.split(" ")[0] || "Athlete";
 
   // Closest tier — highest athFit score across all tiers
