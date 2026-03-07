@@ -111,7 +111,10 @@ export default function StayGrittyModal({ results, athlete, onEditProfile, onBro
           <div style={{ fontSize: 13, color: "#6b8c72", fontFamily: "'Barlow', sans-serif", marginBottom: 14 }}>
             You scored <strong style={{ color: "#c8f5a0" }}>{(closestScore * 100).toFixed(1)}%</strong> as
             a {athlete.position} at the {tierLabel} level —
-            just <strong style={{ color: "#f5a623" }}>{gapPct.toFixed(1)}%</strong> from qualifying.
+            {gapPct <= 15
+              ? <> just <strong style={{ color: "#f5a623" }}>{gapPct.toFixed(1)}%</strong> from qualifying.</>
+              : <> the qualifying threshold is 50%. Keep developing and update your profile as you improve.</>
+            }
           </div>
           {comps && (
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
