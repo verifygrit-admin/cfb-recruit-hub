@@ -30,7 +30,7 @@ const AWARD_OPTIONS = [
   { key: "allState",        label: "All-State" },
 ];
 
-export default function QuickListForm({ athlete, onChange, onAwardChange, onSubmit, loading, error }) {
+export default function QuickListForm({ athlete, onChange, onAwardChange, onSubmit, loading, error, geocoding }) {
   const set = (key, val) => onChange(key, val);
 
   return (
@@ -49,6 +49,7 @@ export default function QuickListForm({ athlete, onChange, onAwardChange, onSubm
                 <label>{f.label}</label>
                 {f.type === "select"
                   ? <select value={athlete[f.key]} onChange={e => set(f.key, e.target.value)}>
+                      <option value="" disabled>Select position</option>
                       {f.options.map(o => <option key={o} value={o}>{o}</option>)}
                     </select>
                   : <input type={f.type} value={athlete[f.key]} placeholder={f.ph}
@@ -57,6 +58,18 @@ export default function QuickListForm({ athlete, onChange, onAwardChange, onSubm
               </div>
             ))}
           </div>
+          {sec.title === "Identity" && (
+            <div className="geo-status">
+              {geocoding
+                ? <span className="geo-locating">Locating school…</span>
+                : athlete.geoLabel
+                  ? <span className="geo-found">Located: {athlete.geoLabel.split(",").slice(0, 3).join(",")}</span>
+                  : athlete.highSchool && athlete.state
+                    ? <span className="geo-miss">Location not found — distance will use state center</span>
+                    : null
+              }
+            </div>
+          )}
         </div>
       ))}
 

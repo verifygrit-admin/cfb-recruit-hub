@@ -1,18 +1,20 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import ModeToggle from "./components/ModeToggle.jsx";
 import MapView from "./components/MapView.jsx";
 import QuickListForm from "./components/QuickListForm.jsx";
 import ResultsTable from "./components/ResultsTable.jsx";
 import Sidebar from "./components/Sidebar.jsx";
 import Tutorial from "./components/Tutorial.jsx";
-import { fetchSchools, fetchTracker, saveRecruit } from "./lib/api.js";
+import HelmetAnim from "./components/HelmetAnim.jsx";
+import { fetchSchools, fetchTracker, saveRecruit, geocodeHighSchool } from "./lib/api.js";
 import { runQuickList } from "./lib/scoring.js";
 
 const BLANK_ATHLETE = {
   name: "", highSchool: "", gradYear: "",
-  position: "WR", height: "", weight: "", speed40: "",
+  position: "", height: "", weight: "", speed40: "",
   gpa: "", sat: "",
   state: "",
+  hsLat: null, hsLng: null, geoLabel: null,
   agi: "", dependents: "",
   awards: { expectedStarter: false, captain: false, allConference: false, allState: false },
 };
@@ -33,15 +35,51 @@ export default function App() {
   const [dataError, setDataError]     = useState(null);
   const [panel, setPanel]     = useState("map");
   const [filters, setFilters] = useState(BLANK_FILTERS);
-  const [showTutorial, setShowTutorial] = useState(false);
-  const [drawerOpen, setDrawerOpen]     = useState(false);
+  const [showTutorial, setShowTutorial]   = useState(false);
+  const [tutorialType, setTutorialType]   = useState("browse");
+  const [drawerOpen, setDrawerOpen]       = useState(false);
+  const [geocoding, setGeocoding]         = useState(false);
+  const [showBrowseAnim, setShowBrowseAnim] = useState(false);
+  const [showQLAnim, setShowQLAnim]         = useState(false);
+  const browseAnimShown = useRef(false);
+  const qlAnimShown     = useRef(false);
 
   useEffect(() => {
     fetchSchools()
       .then(s => { setSchools(s); setDataLoaded(true); })
       .catch(e => setDataError(e.message));
     fetchTracker().then(setTracker).catch(() => {});
+    // Show browse helmet animation on first load
+    if (!browseAnimShown.current) {
+      browseAnimShown.current = true;
+      setShowBrowseAnim(true);
+    }
   }, []);
+
+  // Show QL helmet animation when results first appear
+  useEffect(() => {
+    if (results && !qlAnimShown.current) {
+      qlAnimShown.current = true;
+      setShowQLAnim(true);
+    }
+  }, [results]);
+
+  // Auto-geocode when highSchool + state both have values
+  useEffect(() => {
+    const { highSchool, state } = athlete;
+    if (!highSchool.trim() || !state.trim()) return;
+    const timer = setTimeout(async () => {
+      setGeocoding(true);
+      const result = await geocodeHighSchool(highSchool.trim(), state.trim());
+      setGeocoding(false);
+      if (result) {
+        setAthlete(a => ({ ...a, hsLat: result.lat, hsLng: result.lng, geoLabel: result.display }));
+      } else {
+        setAthlete(a => ({ ...a, hsLat: null, hsLng: null, geoLabel: null }));
+      }
+    }, 800);
+    return () => clearTimeout(timer);
+  }, [athlete.highSchool, athlete.state]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Compute visible count for sidebar
   const visibleCount = useMemo(() => {
@@ -132,7 +170,10 @@ export default function App() {
           )}
           <ModeToggle mode={mode} onChange={m => { setMode(m); if (m === "browse") setPanel("map"); }} />
           {isBrowse && (
-            <button id="tutHelpBtn" onClick={() => setShowTutorial(true)} aria-label="Help">?</button>
+            <button id="tutHelpBtn" className="help-btn" onClick={() => { setTutorialType("browse"); setShowTutorial(true); }} aria-label="Help">?</button>
+          )}
+          {!isBrowse && (
+            <button id="qlHelpBtn" className="help-btn" onClick={() => { setTutorialType("quicklist"); setShowTutorial(true); }} aria-label="Quick List Help">?</button>
           )}
         </div>
       </header>
@@ -177,13 +218,15 @@ export default function App() {
                   </div>
                 )}
                 <div className="summary-bar">
-                  <span className="stat">Matches: <strong>{results.top30.length}</strong></span>
-                  {results.topTier && <span className="stat">Top Tier: <strong>{results.topTier}</strong></span>}
+                  {results.topTier && <span className="stat">Tier: <strong>{results.topTier}</strong></span>}
                   {results.recruitReach && <span className="stat">Reach: <strong>{results.recruitReach} mi</strong></span>}
+                  <span className="stat" style={{ color: "#6ed430" }}>Top: <strong>{results.top30?.length ?? 0}</strong></span>
+                  <span className="stat" style={{ color: "#f5a623" }}>Good: <strong>{(results.top50?.length ?? 0) - (results.top30?.length ?? 0) > 0 ? Math.min((results.top50?.length ?? 0) - (results.top30?.length ?? 0), 10) : 0}</strong></span>
+                  <span className="stat" style={{ color: "#ef5350" }}>Border: <strong>{Math.max(0, (results.top50?.length ?? 0) - 40)}</strong></span>
                   <button
                     onClick={() => setResults(null)}
-                    style={{ marginLeft: "auto", padding: "4px 12px", background: "transparent", border: "1px solid var(--border)", borderRadius: 3, color: "var(--muted)", fontFamily: "'Barlow Condensed',sans-serif", fontSize: 11, letterSpacing: 1 }}
-                  >Edit Profile</button>
+                    style={{ marginLeft: "auto", padding: "5px 14px", background: "#2e6b18", border: "1px solid #6ed430", borderRadius: 3, color: "#c8f5a0", fontFamily: "'Barlow Condensed',sans-serif", fontSize: 12, letterSpacing: 1, fontWeight: 700, cursor: "pointer" }}
+                  >Edit My Profile</button>
                 </div>
               </div>
             ) : (
@@ -195,6 +238,7 @@ export default function App() {
                   onSubmit={handleSubmit}
                   loading={loading}
                   error={error}
+                  geocoding={geocoding}
                 />
               </div>
             )
@@ -202,7 +246,27 @@ export default function App() {
         </div>
       </div>
 
-      {showTutorial && <Tutorial onClose={() => setShowTutorial(false)} />}
+      {showTutorial && <Tutorial type={tutorialType} onClose={() => setShowTutorial(false)} />}
+      {showBrowseAnim && (
+        <HelmetAnim targetId="tutHelpBtn" onDone={() => {
+          setShowBrowseAnim(false);
+          if (!localStorage.getItem("cfb_browse_tutSeen")) {
+            localStorage.setItem("cfb_browse_tutSeen", "1");
+            setTutorialType("browse");
+            setShowTutorial(true);
+          }
+        }} />
+      )}
+      {showQLAnim && (
+        <HelmetAnim targetId="qlHelpBtn" onDone={() => {
+          setShowQLAnim(false);
+          if (!localStorage.getItem("cfb_ql_tutSeen")) {
+            localStorage.setItem("cfb_ql_tutSeen", "1");
+            setTutorialType("quicklist");
+            setShowTutorial(true);
+          }
+        }} />
+      )}
     </div>
   );
 }

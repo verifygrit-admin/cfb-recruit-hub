@@ -1,10 +1,9 @@
 import { useState } from "react";
-import { DIV_COLORS } from "../lib/constants.js";
 
-const SLIDES = [
+const BROWSE_SLIDES = [
   {
     num: "01 / 04",
-    title: "Welcome to the GRIT FIT CFB Recruit Hub",
+    title: "Welcome to Browse Schools",
     body: "This map shows every NCAA football program — 661 schools across all divisions. Markers are color-coded by division tier. Click any marker to see program details, recruiting links, and financial data.",
     extra: (
       <div className="tut-legend">
@@ -52,7 +51,7 @@ const SLIDES = [
     body: "Use the left sidebar to narrow your search:",
     extra: (
       <ul className="tut-list">
-        <li><strong>Division Tier</strong> — show only Power 4, G5, FCS, D2, or D3 programs</li>
+        <li><strong>Division Tier</strong> — show only Power 4, G6, FCS, D2, or D3 programs</li>
         <li><strong>Admissions Selectivity</strong> — filter by how selective the school is academically</li>
         <li><strong>Conference</strong> — drill into a specific conference</li>
         <li><strong>ADLTV Rank</strong> — show only top-ranked programs by lifetime value</li>
@@ -60,27 +59,121 @@ const SLIDES = [
         <li><strong>Search</strong> — find a specific school by name</li>
       </ul>
     ),
-    tip: "On mobile, tap the ≡ button to open the filter panel.",
+    tip: "On mobile, tap the menu button to open the filter panel.",
   },
   {
     num: "04 / 04",
     title: "My Quick List",
-    body: "Switch to MY QUICK LIST mode in the top-right to enter your athlete profile. The GRIT FIT Formula will score every program against your athletic metrics, academic scores, location, and financial data — then highlight your best matches on the map.",
+    body: "Switch to MY QUICK LIST in the top-right to enter your athlete profile. The GRIT FIT Formula scores every program against your athletic metrics, academic scores, location, and financial data.",
     extra: (
       <ul className="tut-list">
-        <li>Green markers = top matching programs</li>
-        <li>Score is based on academic fit, athletic tier match, distance, and recruit reach</li>
-        <li>Click any green marker for Recruiting Q and Coaching Staff links</li>
+        <li>Green markers = Top Match (ranks 1–30)</li>
+        <li>Gold markers = Good Match (ranks 31–40)</li>
+        <li>Red markers = Borderline (ranks 41–50)</li>
         <li>Switch to TABLE view for sortable results with net cost and ROI data</li>
       </ul>
     ),
-    tip: "Your profile data is saved to help coaches connect with you. Fields marked Optional are not required to generate results.",
+    tip: "Your profile data is saved to help coaches connect with you.",
   },
 ];
 
-export default function Tutorial({ onClose }) {
+const QL_SLIDES = [
+  {
+    num: "01 / 05",
+    title: "What is My Quick List?",
+    body: "The GRIT FIT Formula evaluates every NCAA program against your personal profile — athletic metrics, academics, location, and household finances — to surface your best realistic matches.",
+    extra: (
+      <div className="tut-defs">
+        {[
+          { term: "My Athletic Score", desc: "How your height, weight, and 40-yard dash compare to the median athlete at each division level for your position. Awards (All-State, Captain, etc.) add bonus points." },
+          { term: "My Academic Rigor Score", desc: "How your SAT + GPA combination compares to the academic profile of students admitted to each school. Used to match you with programs where you're a realistic academic fit." },
+          { term: "My Test Optional Score", desc: "A GPA-only version of your academic score, used for schools that don't require standardized test scores. If a school is test-optional, this score is what drives your academic match." },
+          { term: "Recruit Reach", desc: "The maximum distance coaches at your tier typically recruit. Programs beyond this radius are filtered out." },
+        ].map(({ term, desc }) => (
+          <div key={term} className="tut-def-row">
+            <div className="tut-def-term">{term}</div>
+            <div className="tut-def-desc">{desc}</div>
+          </div>
+        ))}
+      </div>
+    ),
+    tip: null,
+  },
+  {
+    num: "02 / 05",
+    title: "Your Score Dashboard",
+    body: "After submitting your profile, three scores appear above your results table:",
+    extra: (
+      <div className="tut-defs">
+        {[
+          { term: "My Athletic Score", desc: "Your boosted athletic fit score for your matched division tier. Above 50% = eligible. Higher = stronger athletic profile vs competition at that level." },
+          { term: "My Academic Rigor Score", desc: "Your combined SAT + GPA percentile. Used to rank and sort your Top 50 matches from most to least academically demanding." },
+          { term: "My Test Optional Score", desc: "Your GPA-only score, used for schools with test-optional admissions policies." },
+        ].map(({ term, desc }) => (
+          <div key={term} className="tut-def-row">
+            <div className="tut-def-term">{term}</div>
+            <div className="tut-def-desc">{desc}</div>
+          </div>
+        ))}
+      </div>
+    ),
+    tip: null,
+  },
+  {
+    num: "03 / 05",
+    title: "Reading Your Results",
+    body: "Your top 50 matches are shown on the map and in the table. Hover any column header for a full description.",
+    extra: (
+      <div className="tut-defs">
+        {[
+          { term: "Target Rank", desc: "Your personalized rank — #1 is the school whose academic rigor best matches your profile." },
+          { term: "Net Cost", desc: "Projected 4-year net cost after Expected Family Contribution and estimated merit aid. Requires AGI + dependents in your profile." },
+          { term: "DROI", desc: "Degree ROI — the school's Adjusted Degree Lifetime Value divided by your projected net cost. Higher means better financial return." },
+          { term: "ADLTV", desc: "Adjusted Degree Lifetime Value — estimated lifetime earnings premium for graduates, adjusted for graduation rate." },
+        ].map(({ term, desc }) => (
+          <div key={term} className="tut-def-row">
+            <div className="tut-def-term">{term}</div>
+            <div className="tut-def-desc">{desc}</div>
+          </div>
+        ))}
+      </div>
+    ),
+    tip: "Click any column header to sort your results by that metric.",
+  },
+  {
+    num: "04 / 05",
+    title: "Taking Action",
+    body: "Each matched school has direct links to connect with the program:",
+    extra: (
+      <ul className="tut-list">
+        <li><strong>Recruit Quest.</strong> — submit your recruiting questionnaire directly to the school's coaches</li>
+        <li><strong>Coaching Staff</strong> — view the football staff directory to identify who to contact</li>
+        <li>Use <strong>Edit Profile</strong> in the summary bar to adjust your data and rerun</li>
+        <li>Switch back to <strong>Browse Schools</strong> to explore programs freely</li>
+      </ul>
+    ),
+    tip: "Submitting your questionnaire is the single highest-impact action a recruit can take.",
+  },
+  {
+    num: "05 / 05",
+    title: "Refine Your Results Anytime",
+    body: "Your matches are only as accurate as the information you provide. Use the Edit My Profile button at the bottom of the screen to update your data and rerun the formula at any time.",
+    extra: (
+      <ul className="tut-list">
+        <li><strong>Athletics</strong> — use your honest 40 time and real measurables, not your goal numbers</li>
+        <li><strong>Academics</strong> — enter your current GPA and most recent SAT/ACT score</li>
+        <li><strong>Location</strong> — your high school state affects which programs can realistically recruit you</li>
+        <li><strong>Household</strong> — AGI and dependents unlock personalized net cost and ROI data</li>
+      </ul>
+    ),
+    tip: "Honest inputs = accurate matches. The formula works best when your profile reflects where you are today.",
+  },
+];
+
+export default function Tutorial({ type = "browse", onClose }) {
   const [idx, setIdx] = useState(0);
-  const slide = SLIDES[idx];
+  const slides = type === "quicklist" ? QL_SLIDES : BROWSE_SLIDES;
+  const slide  = slides[idx];
 
   return (
     <div id="tutOverlay" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
@@ -97,17 +190,17 @@ export default function Tutorial({ onClose }) {
         </div>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 0 20px" }}>
           <button
-            onClick={() => setIdx(i => Math.max(0, i-1))}
+            onClick={() => setIdx(i => Math.max(0, i - 1))}
             disabled={idx === 0}
             style={{ padding: "7px 18px", background: "transparent", border: "1px solid #1e2e21", borderRadius: 3, color: idx === 0 ? "#2a3a2e" : "#6b8c72", cursor: idx === 0 ? "default" : "pointer", fontFamily: "'Barlow Condensed',sans-serif", fontSize: 12, letterSpacing: 1 }}
           >← Back</button>
           <div style={{ display: "flex", gap: 6 }}>
-            {SLIDES.map((_, i) => (
+            {slides.map((_, i) => (
               <div key={i} onClick={() => setIdx(i)} style={{ width: 6, height: 6, borderRadius: "50%", background: i === idx ? "#6ed430" : "#1e2e21", cursor: "pointer" }} />
             ))}
           </div>
-          {idx < SLIDES.length - 1
-            ? <button onClick={() => setIdx(i => i+1)} style={{ padding: "7px 18px", background: "#6ed430", border: "none", borderRadius: 3, color: "#000", cursor: "pointer", fontFamily: "'Barlow Condensed',sans-serif", fontSize: 12, letterSpacing: 1, fontWeight: 700 }}>Next →</button>
+          {idx < slides.length - 1
+            ? <button onClick={() => setIdx(i => i + 1)} style={{ padding: "7px 18px", background: "#6ed430", border: "none", borderRadius: 3, color: "#000", cursor: "pointer", fontFamily: "'Barlow Condensed',sans-serif", fontSize: 12, letterSpacing: 1, fontWeight: 700 }}>Next →</button>
             : <button onClick={onClose} style={{ padding: "7px 18px", background: "#6ed430", border: "none", borderRadius: 3, color: "#000", cursor: "pointer", fontFamily: "'Barlow Condensed',sans-serif", fontSize: 12, letterSpacing: 1, fontWeight: 700 }}>Get Started →</button>
           }
         </div>

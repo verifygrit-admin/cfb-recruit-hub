@@ -3,7 +3,7 @@ import { DIV_COLORS, TIER_LABELS } from "../lib/constants.js";
 
 const TIER_BTNS = [
   { value: "Power 4",   label: "Power 4" },
-  { value: "G5",        label: "G5" },
+  { value: "G6",        label: "G6" },
   { value: "FBS Ind",   label: "FBS Ind" },
   { value: "1-FCS",     label: "FCS" },
   { value: "2-Div II",  label: "D-II" },

@@ -6,13 +6,7 @@ import "leaflet.markercluster/dist/MarkerCluster.Default.css";
 import "leaflet.markercluster";
 import { DIV_COLORS } from "../lib/constants.js";
 
-// Score → green gradient for quicklist mode
-function scoreColor(score) {
-  if (score == null) return "#444";
-  const r = Math.round(255 * (1 - score));
-  const g = Math.round(200 * score + 55);
-  return `rgb(${r},${g},50)`;
-}
+const TIER_COLOR = { top: "#6ed430", good: "#f5a623", borderline: "#ef5350" };
 
 function makeIcon(color, size = 10) {
   return L.divIcon({
@@ -107,28 +101,40 @@ export default function MapView({ schools, results, mode, filters }) {
       let color, size;
 
       if (mode === "quicklist" && results) {
-        if (!scored) { color = "#222"; size = 7; }
-        else if (!scored.eligible) { color = "#333"; size = 7; }
-        else {
-          const norm = results.top30.indexOf(scored) >= 0
-            ? 1 - results.top30.indexOf(scored) / 30
-            : scored.acadScore;
-          color = scoreColor(norm);
-          size = 12;
-        }
+        const tier = scored?.matchTier;
+        if (!tier) return; // hide non-matching schools entirely
+        color = TIER_COLOR[tier];
+        size  = tier === "top" ? 13 : tier === "good" ? 11 : 10;
       } else {
         color = DIV_COLORS[school.Type] || "#888";
         size = 9;
       }
 
-      const schoolName = school["School Name"] || school.School_Name || "Unknown";
-      const div        = school["NCAA Division"] || school.NCAA_Division || "";
-      const conf       = school.Conference || "";
-      const tier       = school.Type || "";
-      const coaRaw     = school["COA (Out-of-State)"] || school.COA || "";
-      const coaNum     = parseFloat(String(coaRaw).replace(/[$,]/g, "")) || 0;
-      const qLink      = school["Recruiting Q Link"] || school.q_link || "";
-      const coachLink  = school["Coach Page"] || school.coach_link || "";
+      const schoolName  = school["School Name"] || school.School_Name || "Unknown";
+      const conf        = school.Conference || "";
+      const tier        = school.Type || "";
+      const coaRaw      = school["COA (Out-of-State)"] || school.COA || "";
+      const coaNum      = parseFloat(String(coaRaw).replace(/[$,]/g, "")) || 0;
+      const qLink       = school["Recruiting Q Link"] || school.q_link || "";
+      const coachLink   = school["Coach Page"] || school.coach_link || "";
+      const meritRaw    = school["Avg Merit Award"] || school.Est_Avg_Merit || "";
+      const meritNum    = parseFloat(String(meritRaw).replace(/[$,]/g, "")) || 0;
+      const adltvRank   = school["ADLTV Rank"] || "";
+      // Format percentage fields — Sheets returns raw decimals (0.734), not "73.4%"
+      const fmtPct = v => {
+        if (v == null || v === "") return "—";
+        if (typeof v === "number") return (v > 1 ? v : v * 100).toFixed(2) + "%";
+        const s = String(v).trim();
+        if (s.endsWith("%")) return s;
+        const n = parseFloat(s);
+        return isNaN(n) ? "—" : (n > 1 ? n : n * 100).toFixed(2) + "%";
+      };
+      const admRate     = fmtPct(school["Admissions Rate"]);
+      const gradRate    = fmtPct(school["Graduation Rate"]);
+      // ADLTV — read pre-computed column from sheet; fall back to scored value in quicklist mode
+      const adltvNum    = scored?.adltv != null
+        ? scored.adltv
+        : parseFloat(String(school.ADLTV || "").replace(/[$,]/g, "")) || 0;
 
       let popupContent = `
         <div class="popup-header">
@@ -139,28 +145,46 @@ export default function MapView({ schools, results, mode, filters }) {
         <div class="popup-body">
           <div class="popup-grid">
             <div class="popup-stat">
-              <div class="popup-stat-label">Division</div>
-              <div class="popup-stat-value">${div}</div>
-            </div>
-            <div class="popup-stat">
               <div class="popup-stat-label">Conference</div>
               <div class="popup-stat-value">${conf}</div>
-            </div>
-            <div class="popup-stat">
-              <div class="popup-stat-label">COA (OOS)</div>
-              <div class="popup-stat-value">$${Math.round(coaNum).toLocaleString()}</div>
             </div>
             <div class="popup-stat">
               <div class="popup-stat-label">Admissions Select.</div>
               <div class="popup-stat-value">${school["School Type"] || ""}</div>
             </div>
+            <div class="popup-stat">
+              <div class="popup-stat-label">ADLTV</div>
+              <div class="popup-stat-value">${adltvNum ? "$" + Math.round(adltvNum).toLocaleString() : "—"}</div>
+            </div>
+            <div class="popup-stat">
+              <div class="popup-stat-label">ADLTV Rank</div>
+              <div class="popup-stat-value">${adltvRank ? "#" + adltvRank : "—"}</div>
+            </div>
+            <div class="popup-stat">
+              <div class="popup-stat-label">Admission Rate</div>
+              <div class="popup-stat-value">${admRate}</div>
+            </div>
+            <div class="popup-stat">
+              <div class="popup-stat-label">Graduation Rate</div>
+              <div class="popup-stat-value">${gradRate}</div>
+            </div>
+            <div class="popup-stat">
+              <div class="popup-stat-label">COA (Out-of-State)</div>
+              <div class="popup-stat-value">${coaNum ? "$" + Math.round(coaNum).toLocaleString() : "—"}</div>
+            </div>
+            <div class="popup-stat">
+              <div class="popup-stat-label">Est. Avg Merit</div>
+              <div class="popup-stat-value">${meritNum ? "$" + Math.round(meritNum).toLocaleString() : "—"}</div>
+            </div>
           </div>
       `;
 
-      if (scored?.eligible) {
+      if (scored?.matchTier) {
+        const tierLabel = scored.matchTier === "top" ? "TOP MATCH" : scored.matchTier === "good" ? "GOOD MATCH" : "BORDERLINE";
+        const tierCol   = TIER_COLOR[scored.matchTier];
         popupContent += `
           <hr style="border:none;border-top:1px solid var(--border);margin:8px 0;"/>
-          <div style="color:#6ed430;font-weight:bold;margin-bottom:6px;font-family:'Barlow Condensed',sans-serif;font-size:13px;letter-spacing:1px;">✓ IN YOUR QUICK LIST</div>
+          <div style="color:${tierCol};font-weight:bold;margin-bottom:6px;font-family:'Barlow Condensed',sans-serif;font-size:13px;letter-spacing:1px;">✓ #${scored.matchRank} — ${tierLabel}</div>
           <div class="popup-grid">
             <div class="popup-stat"><div class="popup-stat-label">Acad Fit</div><div class="popup-stat-value">${scored.acadScore?.toFixed(3)}</div></div>
             <div class="popup-stat"><div class="popup-stat-label">Ath Fit</div><div class="popup-stat-value">${scored.athFitScore?.toFixed(3)}</div></div>
@@ -173,8 +197,8 @@ export default function MapView({ schools, results, mode, filters }) {
 
       if (qLink || coachLink) {
         popupContent += `<div class="popup-unitid">`;
-        if (qLink)    popupContent += `<a href="${qLink}"    target="_blank" class="popup-link" style="font-size:11px;padding:4px 8px;">Recruit Q →</a>`;
-        if (coachLink) popupContent += `<a href="${coachLink}" target="_blank" class="popup-link" style="font-size:11px;padding:4px 8px;margin-left:6px;">Staff →</a>`;
+        if (qLink)     popupContent += `<a href="${qLink}"     target="_blank" class="popup-link">📋 Recruiting Questionnaire</a>`;
+        if (coachLink) popupContent += `<a href="${coachLink}" target="_blank" class="popup-link">🏈 Coaching Staff</a>`;
         popupContent += `</div>`;
       }
 
@@ -201,10 +225,10 @@ export default function MapView({ schools, results, mode, filters }) {
         }}>
           <div style={{ color: "#6ed430", marginBottom: 6, letterSpacing: 2, fontWeight: 700 }}>MAP LEGEND</div>
           {[
-            { color: scoreColor(0.9), label: "Top match" },
-            { color: scoreColor(0.5), label: "Good match" },
-            { color: scoreColor(0.1), label: "Borderline" },
-            { color: "#333",          label: "Not eligible" },
+            { color: TIER_COLOR.top,        label: "Top match (1–30)" },
+            { color: TIER_COLOR.good,       label: "Good match (31–40)" },
+            { color: TIER_COLOR.borderline, label: "Borderline (41–50)" },
+            { color: "#1c2a1e",             label: "Not eligible" },
           ].map(({ color, label }) => (
             <div key={label} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
               <div style={{ width: 10, height: 10, borderRadius: "50%", background: color, border: "1px solid rgba(255,255,255,0.3)" }} />
