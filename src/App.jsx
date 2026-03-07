@@ -136,6 +136,9 @@ export default function App() {
     return () => clearTimeout(timer);
   }, [athlete.highSchool, athlete.state]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Stable array of short-listed UNITIDs — memoized so MapView doesn't re-render markers on every App render
+  const shortListIds = useMemo(() => shortList.map(s => String(s.UNITID)), [shortList]);
+
   // Compute visible count for sidebar
   const visibleCount = useMemo(() => {
     if (!schools.length || mode !== "browse") return 0;
@@ -350,7 +353,7 @@ export default function App() {
           ) : isBrowse ? (
             <div style={{ flex: 1 }}>
               {dataLoaded
-                ? <MapView schools={schools} results={null} mode="browse" filters={filters} shortListIds={shortList.map(s => String(s.UNITID))} />
+                ? <MapView schools={schools} results={null} mode="browse" filters={filters} shortListIds={shortListIds} />
                 : <div className="loading-screen">Loading School Data…</div>}
             </div>
           ) : (
@@ -358,7 +361,7 @@ export default function App() {
               <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
                 {panel === "map" ? (
                   <div style={{ flex: 1, position: "relative" }}>
-                    <MapView schools={schools} results={results} mode="quicklist" filters={null} shortListIds={shortList.map(s => String(s.UNITID))} />
+                    <MapView schools={schools} results={results} mode="quicklist" filters={null} shortListIds={shortListIds} />
                     {showResultsModal && (
                       <div style={{
                         position: "absolute", inset: 0, zIndex: 1000,
