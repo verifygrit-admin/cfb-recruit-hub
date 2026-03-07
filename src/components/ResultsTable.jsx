@@ -134,7 +134,7 @@ export default function ResultsTable({ results, name }) {
       <TooltipPortal text={tooltip?.text} x={tooltip?.x} y={tooltip?.y} />
 
       <div className="ql-table-header" style={{ color: "#ffffff" }}>{name ? `${name}'s GRIT FIT Results` : "GRIT FIT Results"}</div>
-      <div style={{ fontSize: 12, color: "#c8f5a0", fontFamily: "'Barlow', sans-serif", fontWeight: 400, marginBottom: 16, marginTop: -8 }}>
+      <div style={{ fontSize: 12, color: "#c8f5a0", fontFamily: "'Barlow', sans-serif", fontWeight: 400, marginBottom: 16, marginTop: -4, textAlign: "center" }}>
         Your personalized target college football recruiting matches
       </div>
 

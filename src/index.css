@@ -420,9 +420,10 @@ select:focus { outline: none; border-color: var(--accent); }
   font-size: 11px; color: var(--muted);
 }
 .ql-table-header {
-  font-family: 'Barlow Condensed', sans-serif; font-size: 11px;
-  letter-spacing: 2px; color: var(--accent); margin-bottom: 12px;
-  font-weight: 700; text-transform: uppercase; padding-top: 8px;
+  font-family: 'Barlow Condensed', sans-serif; font-size: 56px;
+  letter-spacing: 1px; color: var(--accent); margin-bottom: 4px;
+  font-weight: 700; text-transform: uppercase; padding-top: 20px;
+  text-align: center; line-height: 1.05;
 }
 
 /* ── RESULTS TABLE ─────────────────────────────────────────────────── */
