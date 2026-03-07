@@ -155,7 +155,10 @@ export default function ResultsTable({ results, name }) {
         </div>
       </div>
 
-      <div className="ql-table-header">{name ? `${name}'s Target CFB Recruiting Matches` : `Top ${top50.length} Matches`}</div>
+      <div className="ql-table-header">{name ? `${name}'s GRIT FIT Results` : "GRIT FIT Results"}</div>
+      <div style={{ fontSize: 12, color: "#6b8c72", fontFamily: "'Barlow', sans-serif", fontWeight: 400, marginBottom: 16, marginTop: -8 }}>
+        Your personalized target college football recruiting matches
+      </div>
 
       <div style={{ overflowX: "auto", border: "1px solid #1e2e21", borderRadius: 4 }}>
         <table className="results-table">

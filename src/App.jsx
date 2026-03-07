@@ -256,11 +256,14 @@ export default function App() {
                           textAlign: "center", fontFamily: "'Barlow Condensed', sans-serif",
                         }}>
                           <div style={{ fontSize: 32, marginBottom: 12 }}>🏈</div>
-                          <div style={{ fontSize: 20, fontWeight: 700, color: "#6ed430", letterSpacing: 1, marginBottom: 12 }}>
-                            Your Target CFB Recruiting Matches are ready!
+                          <div style={{ fontSize: 22, fontWeight: 700, color: "#6ed430", letterSpacing: 1, marginBottom: 6 }}>
+                            Your GRIT FIT Results are ready.
+                          </div>
+                          <div style={{ fontSize: 12, color: "#c8f5a0", letterSpacing: 0.5, marginBottom: 16, fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 600, textTransform: "uppercase" }}>
+                            Your personalized target college football recruiting matches
                           </div>
                           <div style={{ fontSize: 13, color: "#6b8c72", lineHeight: 1.6, marginBottom: 24, fontFamily: "'Barlow', sans-serif", fontWeight: 400 }}>
-                            The map below shows your personalized program matches, color-coded by fit tier.
+                            The map below shows your matched programs, color-coded by fit tier.
                             Green markers are your Top Matches, gold are Good Matches, and red are Borderline.
                             Click any marker to view school details and access recruiting links.
                             Switch to <strong style={{ color: "#c8f5a0" }}>Table</strong> view for full financial and ROI data.
