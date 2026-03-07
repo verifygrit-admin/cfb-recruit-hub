@@ -62,3 +62,13 @@ export async function saveRecruit(profile) {
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
 }
+
+export async function updateRecruit(profile) {
+  if (!API_BASE) throw new Error("VITE_API_BASE not set. See README.");
+  const res = await fetch(`${API_BASE}?action=updateRecruit`, {
+    method: "POST",
+    body: JSON.stringify(profile),
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}

@@ -105,7 +105,7 @@ function LinkTH({ label, desc, tooltip, setTooltip }) {
   );
 }
 
-export default function ResultsTable({ results }) {
+export default function ResultsTable({ results, name }) {
   const [sort, setSort]   = useState({ col: "matchRank", asc: true });
   const [tooltip, setTooltip] = useState(null); // { text, x, y }
 
@@ -155,7 +155,7 @@ export default function ResultsTable({ results }) {
         </div>
       </div>
 
-      <div className="ql-table-header">Top {top50.length} Matches</div>
+      <div className="ql-table-header">{name ? `${name}'s Target CFB Recruiting Matches` : `Top ${top50.length} Matches`}</div>
 
       <div style={{ overflowX: "auto", border: "1px solid #1e2e21", borderRadius: 4 }}>
         <table className="results-table">

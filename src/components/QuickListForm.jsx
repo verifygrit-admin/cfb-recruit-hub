@@ -3,26 +3,29 @@ import { POSITIONS } from "../lib/constants.js";
 
 const FORM_SECTIONS = [
   { title: "Identity", fields: [
-    { label: "Full Name",   key: "name",      type: "text",   ph: "Full Name" },
-    { label: "High School", key: "highSchool", type: "text",   ph: "Anytown High School",
+    { label: "Full Name",              key: "name",      type: "text",  ph: "Full Name", required: true },
+    { label: "High School",            key: "highSchool",type: "text",  ph: "Anytown High School", required: true,
       info: "Enter the full official name of your high school exactly as it appears — including words like 'High School', 'Academy', or 'Prep'. An accurate name ensures your recruiting reach distance is calculated from your actual location rather than a state estimate." },
-    { label: "State (HS)", key: "state",      type: "text",   ph: "PA" },
-    { label: "Expected Grad Year", key: "gradYear", type: "gradYear" },
+    { label: "State (HS)",             key: "state",     type: "text",  ph: "PA", required: true },
+    { label: "Expected Grad Year",     key: "gradYear",  type: "gradYear", required: true },
+    { label: "Student-Athlete Email",  key: "email",     type: "email", ph: "athlete@email.com", required: true },
+    { label: "Primary Phone",          key: "phone",     type: "tel",   ph: "(555) 555-5555", required: false },
+    { label: "Twitter/X Handle",       key: "twitter",   type: "text",  ph: "@handle", required: false },
   ]},
   { title: "Athletics", fields: [
-    { label: "Primary Position", key: "position", type: "select", options: POSITIONS },
-    { label: "Height (inches)",  key: "height",   type: "number", ph: "72" },
-    { label: "Weight (lbs)",     key: "weight",   type: "number", ph: "185" },
-    { label: "40-Yard Time",     key: "speed40",  type: "number", ph: "4.60" },
+    { label: "Primary Position", key: "position", type: "select", options: POSITIONS, required: true },
+    { label: "Height (inches)",  key: "height",   type: "number", ph: "72",   required: true },
+    { label: "Weight (lbs)",     key: "weight",   type: "number", ph: "185",  required: true },
+    { label: "40-Yard Time",     key: "speed40",  type: "number", ph: "4.60", required: true },
   ]},
   { title: "Academics", fields: [
-    { label: "Cumulative GPA",  key: "gpa", type: "number", ph: "3.20" },
-    { label: "PSAT/SAT Score",  key: "sat", type: "number", ph: "If you have not taken PSAT or SAT, leave blank to default to a score of 1000",
+    { label: "Cumulative GPA",  key: "gpa", type: "number", ph: "3.20", required: true },
+    { label: "PSAT/SAT Score",  key: "sat", type: "number", ph: "If you have not taken PSAT or SAT, leave blank to default to a score of 1000", required: false,
       info: "Our model currently evaluates PSAT/SAT scores only and does not yet factor in ACT scores. ACT scoring will be added in a future update." },
   ]},
   { title: "Family Financials (Optional)", fields: [
-    { label: "Adjusted Gross Income", key: "agi",        type: "currency", ph: "$85,000" },
-    { label: "# of Dependents",       key: "dependents", type: "dependents",
+    { label: "Adjusted Gross Income", key: "agi",        type: "currency",   ph: "$85,000", required: false },
+    { label: "# of Dependents",       key: "dependents", type: "dependents", required: false,
       info: "Colleges and the U.S. Department of Education use household size (number of dependents) together with Adjusted Gross Income to determine financial aid eligibility and estimate the amount of aid a student's household qualifies for from different types of institutions." },
   ]},
 ];
@@ -34,7 +37,7 @@ const AWARD_OPTIONS = [
   { key: "allState",        label: "All-State" },
 ];
 
-export default function QuickListForm({ athlete, onChange, onAwardChange, onSubmit, loading, error, geocoding }) {
+export default function QuickListForm({ athlete, onChange, onAwardChange, onSubmit, onNewProfile, loading, error, geocoding, hasSaid }) {
   const set = (key, val) => onChange(key, val);
   const [activeInfo, setActiveInfo] = useState(null);
 
@@ -52,7 +55,7 @@ export default function QuickListForm({ athlete, onChange, onAwardChange, onSubm
             {sec.fields.map(f => (
               <div key={f.key} className="form-field" style={f.key === "sat" ? { gridColumn: "1 / span 2" } : {}}>
                 <label style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                  {f.label}
+                  {f.label}{f.required && <span style={{ color: "#ef5350", marginLeft: 1 }}>*</span>}
                   {f.info && (
                     <span style={{ position: "relative", display: "inline-flex", alignItems: "center" }}>
                       <button
@@ -150,9 +153,21 @@ export default function QuickListForm({ athlete, onChange, onAwardChange, onSubm
         </div>
       </div>
 
-      <button className="form-submit" onClick={onSubmit} disabled={loading}>
-        {loading ? "Running GRIT FIT Formula…" : "Generate My Quick List →"}
-      </button>
+      <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+        <button className="form-submit" onClick={() => onSubmit(false)} disabled={loading} style={{ flex: 1 }}>
+          {loading ? "Running GRIT FIT Formula…" : hasSaid ? "Update My Quick List →" : "Generate My Quick List →"}
+        </button>
+        {hasSaid && (
+          <button
+            className="form-submit"
+            onClick={onNewProfile}
+            disabled={loading}
+            style={{ flex: "0 0 auto", background: "#1a2e1d", borderColor: "#6b8c72", color: "#6b8c72" }}
+          >
+            Submit New Profile
+          </button>
+        )}
+      </div>
     </div>
   );
 }

@@ -6,11 +6,11 @@ import ResultsTable from "./components/ResultsTable.jsx";
 import Sidebar from "./components/Sidebar.jsx";
 import Tutorial from "./components/Tutorial.jsx";
 import HelmetAnim from "./components/HelmetAnim.jsx";
-import { fetchSchools, fetchTracker, saveRecruit, geocodeHighSchool } from "./lib/api.js";
+import { fetchSchools, fetchTracker, saveRecruit, updateRecruit, geocodeHighSchool } from "./lib/api.js";
 import { runQuickList } from "./lib/scoring.js";
 
 const BLANK_ATHLETE = {
-  name: "", highSchool: "", gradYear: "",
+  name: "", highSchool: "", gradYear: "", email: "", phone: "", twitter: "",
   position: "", height: "", weight: "", speed40: "",
   gpa: "", sat: "",
   state: "",
@@ -41,6 +41,9 @@ export default function App() {
   const [geocoding, setGeocoding]         = useState(false);
   const [showBrowseAnim, setShowBrowseAnim] = useState(false);
   const [showQLAnim, setShowQLAnim]         = useState(false);
+  const [showResultsModal, setShowResultsModal] = useState(false);
+  const [said, setSaid]                     = useState(null);   // SAID of last saved profile
+  const [savedIdentity, setSavedIdentity]   = useState(null);   // { name, email } at save time
   const browseAnimShown = useRef(false);
   const qlAnimShown     = useRef(false);
 
@@ -116,11 +119,16 @@ export default function App() {
     setAthlete(a => ({ ...a, awards: { ...a.awards, [key]: val } }));
   }, []);
 
-  async function handleSubmit() {
+  async function handleSubmit(forceNew = false) {
     setError(null);
-    const { position, height, weight, speed40, state } = athlete;
+    const { name, highSchool, gradYear, email, position, height, weight, speed40, state, gpa } = athlete;
+    if (!name) { setError("Full Name is required."); return; }
+    if (!highSchool) { setError("High School is required."); return; }
     if (!state) { setError("State (HS) is required — used to calculate recruit reach distance."); return; }
+    if (!gradYear) { setError("Expected Grad Year is required."); return; }
+    if (!email) { setError("Student-Athlete Email is required."); return; }
     if (!position || !height || !weight || !speed40) { setError("Position, Height, Weight, and 40-Yard Time are required."); return; }
+    if (!gpa) { setError("Cumulative GPA is required."); return; }
 
     setLoading(true);
     try {
@@ -128,7 +136,7 @@ export default function App() {
         ...athlete,
         height: +athlete.height, weight: +athlete.weight, speed40: +athlete.speed40,
         gpa: athlete.gpa ? +athlete.gpa : null,
-        sat: athlete.sat ? +athlete.sat : null,  // scoring.js defaults to 1000 if null
+        sat: athlete.sat ? +athlete.sat : null,
         agi: athlete.agi ? +athlete.agi : null,
         dependents: athlete.dependents ? (athlete.dependents === "4+" ? 4 : +athlete.dependents) : null,
       };
@@ -136,12 +144,36 @@ export default function App() {
       setResults(res);
       setMode("quicklist");
       setPanel("map");
-      saveRecruit({ ...parsed, timestamp: new Date().toISOString() }).catch(() => {});
+      setShowResultsModal(true);
+
+      // Determine whether to update existing record or insert new one
+      const identityChanged = savedIdentity &&
+        (athlete.name !== savedIdentity.name || athlete.email !== savedIdentity.email);
+
+      if (!forceNew && said && !identityChanged) {
+        // Update existing record
+        updateRecruit({ ...parsed, said, timestamp: new Date().toISOString() })
+          .catch(() => {});
+      } else {
+        // New insert
+        setSaid(null); // clear optimistically; will be set from response
+        saveRecruit({ ...parsed, timestamp: new Date().toISOString() })
+          .then(r => { if (r?.said) { setSaid(r.said); setSavedIdentity({ name: athlete.name, email: athlete.email }); } })
+          .catch(() => {});
+      }
     } catch (e) {
       setError(e.message);
     } finally {
       setLoading(false);
     }
+  }
+
+  function handleNewProfile() {
+    setSaid(null);
+    setSavedIdentity(null);
+    setResults(null);
+    setAthlete(BLANK_ATHLETE);
+    setMode("quicklist");
   }
 
   const isBrowse = mode === "browse";
@@ -209,12 +241,47 @@ export default function App() {
             results ? (
               <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
                 {panel === "map" ? (
-                  <div style={{ flex: 1 }}>
+                  <div style={{ flex: 1, position: "relative" }}>
                     <MapView schools={schools} results={results} mode="quicklist" filters={null} />
+                    {showResultsModal && (
+                      <div style={{
+                        position: "absolute", inset: 0, zIndex: 1000,
+                        background: "rgba(6,10,7,0.82)",
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        padding: "24px",
+                      }}>
+                        <div style={{
+                          background: "#0e1510", border: "1px solid #2e6b18",
+                          borderRadius: 6, padding: "32px 28px", maxWidth: 400, width: "100%",
+                          textAlign: "center", fontFamily: "'Barlow Condensed', sans-serif",
+                        }}>
+                          <div style={{ fontSize: 32, marginBottom: 12 }}>🏈</div>
+                          <div style={{ fontSize: 20, fontWeight: 700, color: "#6ed430", letterSpacing: 1, marginBottom: 12 }}>
+                            Your Target CFB Recruiting Matches are ready!
+                          </div>
+                          <div style={{ fontSize: 13, color: "#6b8c72", lineHeight: 1.6, marginBottom: 24, fontFamily: "'Barlow', sans-serif", fontWeight: 400 }}>
+                            The map below shows your personalized program matches, color-coded by fit tier.
+                            Green markers are your Top Matches, gold are Good Matches, and red are Borderline.
+                            Click any marker to view school details and access recruiting links.
+                            Switch to <strong style={{ color: "#c8f5a0" }}>Table</strong> view for full financial and ROI data.
+                          </div>
+                          <button
+                            onClick={() => setShowResultsModal(false)}
+                            style={{
+                              padding: "10px 32px", background: "#2e6b18", border: "1px solid #6ed430",
+                              borderRadius: 3, color: "#c8f5a0", fontFamily: "'Barlow Condensed', sans-serif",
+                              fontSize: 13, fontWeight: 700, letterSpacing: 1, cursor: "pointer",
+                            }}
+                          >
+                            View My Matches →
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <div style={{ flex: 1, overflowY: "auto" }}>
-                    <ResultsTable results={results} />
+                    <ResultsTable results={results} name={athlete.name} />
                   </div>
                 )}
                 <div className="summary-bar">
@@ -223,10 +290,18 @@ export default function App() {
                   <span className="stat" style={{ color: "#6ed430" }}>Top: <strong>{results.top30?.length ?? 0}</strong></span>
                   <span className="stat" style={{ color: "#f5a623" }}>Good: <strong>{(results.top50?.length ?? 0) - (results.top30?.length ?? 0) > 0 ? Math.min((results.top50?.length ?? 0) - (results.top30?.length ?? 0), 10) : 0}</strong></span>
                   <span className="stat" style={{ color: "#ef5350" }}>Border: <strong>{Math.max(0, (results.top50?.length ?? 0) - 40)}</strong></span>
-                  <button
-                    onClick={() => setResults(null)}
-                    style={{ marginLeft: "auto", padding: "5px 14px", background: "#2e6b18", border: "1px solid #6ed430", borderRadius: 3, color: "#c8f5a0", fontFamily: "'Barlow Condensed',sans-serif", fontSize: 12, letterSpacing: 1, fontWeight: 700, cursor: "pointer" }}
-                  >Edit My Profile</button>
+                  <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
+                    {said && (
+                      <button
+                        onClick={handleNewProfile}
+                        style={{ padding: "5px 14px", background: "#1a2e1d", border: "1px solid #6b8c72", borderRadius: 3, color: "#6b8c72", fontFamily: "'Barlow Condensed',sans-serif", fontSize: 12, letterSpacing: 1, fontWeight: 700, cursor: "pointer" }}
+                      >New Profile</button>
+                    )}
+                    <button
+                      onClick={() => setResults(null)}
+                      style={{ padding: "5px 14px", background: "#2e6b18", border: "1px solid #6ed430", borderRadius: 3, color: "#c8f5a0", fontFamily: "'Barlow Condensed',sans-serif", fontSize: 12, letterSpacing: 1, fontWeight: 700, cursor: "pointer" }}
+                    >Edit My Profile</button>
+                  </div>
                 </div>
               </div>
             ) : (
@@ -236,9 +311,11 @@ export default function App() {
                   onChange={handleChange}
                   onAwardChange={handleAwardChange}
                   onSubmit={handleSubmit}
+                  onNewProfile={handleNewProfile}
                   loading={loading}
                   error={error}
                   geocoding={geocoding}
+                  hasSaid={!!said}
                 />
               </div>
             )
