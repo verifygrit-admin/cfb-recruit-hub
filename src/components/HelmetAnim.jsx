@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import helmetSrc from "../assets/helmet.png";
 
 const W = 200, H = 250;
 
@@ -58,7 +59,7 @@ export default function HelmetAnim({ targetId, onDone }) {
 
   return (
     <div ref={elRef} className="helmet-anim" aria-hidden="true">
-      <img src={`${import.meta.env.BASE_URL}helmet.png`} alt="" draggable="false" />
+      <img src={helmetSrc} alt="" draggable="false" />
     </div>
   );
 }
