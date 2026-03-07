@@ -130,7 +130,7 @@ export default function App() {
         gpa: athlete.gpa ? +athlete.gpa : null,
         sat: athlete.sat ? +athlete.sat : null,  // scoring.js defaults to 1000 if null
         agi: athlete.agi ? +athlete.agi : null,
-        dependents: athlete.dependents ? +athlete.dependents : null,
+        dependents: athlete.dependents ? (athlete.dependents === "4+" ? 4 : +athlete.dependents) : null,
       };
       const res = runQuickList(parsed, schools, tracker);
       setResults(res);

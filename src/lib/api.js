@@ -20,18 +20,34 @@ export async function fetchTracker() {
   return map;
 }
 
-// Geocode a high school using Nominatim (OpenStreetMap). Returns { lat, lng } or null.
+// Geocode a high school using Nominatim (OpenStreetMap). Returns { lat, lng, display } or null.
+// Strategy: try queries in order of specificity, return first hit.
 export async function geocodeHighSchool(name, state) {
-  const q = encodeURIComponent(`${name}, ${state}, USA`);
+  const nameLC = name.toLowerCase();
+  const alreadyHasSchool = nameLC.includes("school") || nameLC.includes("academy")
+    || nameLC.includes("prep") || nameLC.includes("institute");
+
+  // Build ordered list of query strings to try
+  const queries = [];
+  if (!alreadyHasSchool) {
+    queries.push(`${name} high school, ${state}, USA`); // most specific — bias toward schools
+    queries.push(`${name} School, ${state}, USA`);       // handles "Belmont Hill School"-style names
+  }
+  queries.push(`${name}, ${state}, USA`);                // original fallback
+
   try {
-    const res = await fetch(
-      `https://nominatim.openstreetmap.org/search?q=${q}&countrycodes=us&format=json&limit=1`,
-      { headers: { "Accept-Language": "en", "User-Agent": "GritFit-CFBRecruitHub/1.0" } }
-    );
-    if (!res.ok) return null;
-    const data = await res.json();
-    if (!data.length) return null;
-    return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon), display: data[0].display_name };
+    for (const q of queries) {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&countrycodes=us&format=json&limit=1`,
+        { headers: { "Accept-Language": "en", "User-Agent": "GritFit-CFBRecruitHub/1.0" } }
+      );
+      if (!res.ok) continue;
+      const data = await res.json();
+      if (data.length) {
+        return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon), display: data[0].display_name };
+      }
+    }
+    return null;
   } catch {
     return null;
   }

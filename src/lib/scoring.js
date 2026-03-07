@@ -101,7 +101,8 @@ export function getGPAPercentile(gpa) {
 
 export function calcEFC(agi, deps, control, schoolType) {
   const isElite = ["Super Elite","Elite","Very Selective"].includes(schoolType);
-  const depIdx  = Math.min(Math.max((+deps || 1) - 1, 0), 3); // clamp deps 1–4, convert to 0-index
+  const depNum  = deps === "4+" ? 4 : (+deps || 1);
+  const depIdx  = Math.min(Math.max(depNum - 1, 0), 3); // clamp deps 1–4, convert to 0-index
   // Approximate MATCH type=1: largest row where row.agi <= agi
   let row = EFC_TABLE[0];
   for (const r of EFC_TABLE) {
