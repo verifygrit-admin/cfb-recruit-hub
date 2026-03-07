@@ -154,8 +154,8 @@ export default function App() {
 
       const res = runQuickList(parsed, schools, tracker);
 
-      if (!res.topTier) {
-        // No athletic tier qualified — show Stay Gritty modal instead of results
+      if (!res.topTier || res.top50.length === 0) {
+        // No qualifying tier OR no schools passed all gates — show Stay Gritty modal
         setStayGrittyData(res);
         saveRecruit({ ...parsed, timestamp: new Date().toISOString() }).catch(() => {});
         return;
