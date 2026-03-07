@@ -188,6 +188,10 @@ export default function Tutorial({ type = "browse", onClose }) {
             {slide.tip && <div className="tut-tip">{slide.tip}</div>}
           </div>
         </div>
+        <div className="tut-support">
+          Support: <a href="mailto:verifygrit@gmail.com">verifygrit@gmail.com</a>
+        </div>
+
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 0 20px" }}>
           <button
             onClick={() => setIdx(i => Math.max(0, i - 1))}

@@ -326,6 +326,10 @@ export default function App() {
         </div>
       </div>
 
+      <footer className="app-footer">
+        Support: <a href="mailto:verifygrit@gmail.com">verifygrit@gmail.com</a>
+      </footer>
+
       {showTutorial && <Tutorial type={tutorialType} onClose={() => setShowTutorial(false)} />}
       {showBrowseAnim && (
         <HelmetAnim targetId="tutHelpBtn" onDone={() => {
