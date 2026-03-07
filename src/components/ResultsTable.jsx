@@ -133,6 +133,11 @@ export default function ResultsTable({ results, name }) {
     <div style={{ padding: "0 24px 32px" }} onClick={() => setTooltip(null)}>
       <TooltipPortal text={tooltip?.text} x={tooltip?.x} y={tooltip?.y} />
 
+      <div className="ql-table-header" style={{ color: "#ffffff" }}>{name ? `${name}'s GRIT FIT Results` : "GRIT FIT Results"}</div>
+      <div style={{ fontSize: 12, color: "#c8f5a0", fontFamily: "'Barlow', sans-serif", fontWeight: 400, marginBottom: 16, marginTop: -8 }}>
+        Your personalized target college football recruiting matches
+      </div>
+
       {/* Athlete Score Dashboard */}
       <div className="ql-dashboard">
         <div className="ql-metric">
@@ -153,11 +158,6 @@ export default function ResultsTable({ results, name }) {
           <div className="ql-metric-value">{testOptPct != null ? `${testOptPct}%` : "—"}</div>
           <div className="ql-metric-sub">GPA-only score</div>
         </div>
-      </div>
-
-      <div className="ql-table-header">{name ? `${name}'s GRIT FIT Results` : "GRIT FIT Results"}</div>
-      <div style={{ fontSize: 12, color: "#6b8c72", fontFamily: "'Barlow', sans-serif", fontWeight: 400, marginBottom: 16, marginTop: -8 }}>
-        Your personalized target college football recruiting matches
       </div>
 
       <div style={{ overflowX: "auto", border: "1px solid #1e2e21", borderRadius: 4 }}>
