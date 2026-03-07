@@ -21,7 +21,7 @@ const FORM_SECTIONS = [
   { title: "Academics", fields: [
     { label: "Cumulative GPA",  key: "gpa", type: "number", ph: "3.20", required: true },
     { label: "PSAT/SAT Score",  key: "sat", type: "number", ph: "If you have not taken PSAT or SAT, leave blank to default to a score of 1000", required: false,
-      info: "Our model currently evaluates PSAT/SAT scores only and does not yet factor in ACT scores. ACT scoring will be added in a future update." },
+      info: "If left blank, your score will default to 1000 for matching purposes. Our model currently evaluates PSAT/SAT scores only and does not yet factor in ACT scores. ACT scoring will be added in a future update." },
   ]},
   { title: "Family Financials (Optional)", fields: [
     { label: "Adjusted Gross Income", key: "agi",        type: "currency",   ph: "$85,000", required: false },
