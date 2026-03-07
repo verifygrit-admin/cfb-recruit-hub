@@ -12,7 +12,7 @@ const BLANK_ATHLETE = {
   name: "", highSchool: "", gradYear: "",
   position: "WR", height: "", weight: "", speed40: "",
   gpa: "", sat: "",
-  state: "", hsLat: "", hsLng: "",
+  state: "",
   agi: "", dependents: "",
   awards: { expectedStarter: false, captain: false, allConference: false, allState: false },
 };
@@ -80,8 +80,8 @@ export default function App() {
 
   async function handleSubmit() {
     setError(null);
-    const { hsLat, hsLng, position, height, weight, speed40 } = athlete;
-    if (!hsLat || !hsLng) { setError("HS Latitude and Longitude are required."); return; }
+    const { position, height, weight, speed40, state } = athlete;
+    if (!state) { setError("State (HS) is required — used to calculate recruit reach distance."); return; }
     if (!position || !height || !weight || !speed40) { setError("Position, Height, Weight, and 40-Yard Time are required."); return; }
 
     setLoading(true);
@@ -90,8 +90,7 @@ export default function App() {
         ...athlete,
         height: +athlete.height, weight: +athlete.weight, speed40: +athlete.speed40,
         gpa: athlete.gpa ? +athlete.gpa : null,
-        sat: athlete.sat ? +athlete.sat : null,
-        hsLat: +athlete.hsLat, hsLng: +athlete.hsLng,
+        sat: athlete.sat ? +athlete.sat : null,  // scoring.js defaults to 1000 if null
         agi: athlete.agi ? +athlete.agi : null,
         dependents: athlete.dependents ? +athlete.dependents : null,
       };

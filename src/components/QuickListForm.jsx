@@ -2,24 +2,20 @@ import { POSITIONS } from "../lib/constants.js";
 
 const FORM_SECTIONS = [
   { title: "Identity", fields: [
-    { label: "Full Name",   key: "name",      type: "text",   ph: "Eric Green" },
-    { label: "High School", key: "highSchool", type: "text",   ph: "Pope John Paul II" },
+    { label: "Full Name",   key: "name",      type: "text",   ph: "Full Name" },
+    { label: "High School", key: "highSchool", type: "text",   ph: "Anytown High School" },
+    { label: "State (HS)", key: "state",      type: "text",   ph: "PA" },
     { label: "Grad Year",   key: "gradYear",   type: "number", ph: "2027" },
   ]},
   { title: "Athletics", fields: [
     { label: "Primary Position", key: "position", type: "select", options: POSITIONS },
-    { label: "Height (inches)",  key: "height",   type: "number", ph: "74" },
-    { label: "Weight (lbs)",     key: "weight",   type: "number", ph: "170" },
-    { label: "40-Yard Time",     key: "speed40",  type: "number", ph: "4.50" },
+    { label: "Height (inches)",  key: "height",   type: "number", ph: "72" },
+    { label: "Weight (lbs)",     key: "weight",   type: "number", ph: "185" },
+    { label: "40-Yard Time",     key: "speed40",  type: "number", ph: "4.60" },
   ]},
   { title: "Academics", fields: [
-    { label: "Cumulative GPA",  key: "gpa", type: "number", ph: "3.10" },
-    { label: "PSAT/SAT Score",  key: "sat", type: "number", ph: "1000" },
-  ]},
-  { title: "Location (High School)", fields: [
-    { label: "State",       key: "state",  type: "text",   ph: "PA" },
-    { label: "HS Latitude", key: "hsLat",  type: "number", ph: "40.198" },
-    { label: "HS Longitude",key: "hsLng",  type: "number", ph: "-75.509" },
+    { label: "Cumulative GPA",  key: "gpa", type: "number", ph: "3.20" },
+    { label: "PSAT/SAT Score",  key: "sat", type: "number", ph: "Leave blank to default to 1000" },
   ]},
   { title: "Family Financials (Optional)", fields: [
     { label: "Adjusted Gross Income", key: "agi",        type: "number", ph: "85000" },
@@ -40,7 +36,7 @@ export default function QuickListForm({ athlete, onChange, onAwardChange, onSubm
   return (
     <div className="form-wrapper">
       <h2 className="form-title">Student-Athlete Profile</h2>
-      <p className="form-subtitle">Enter your data to generate a personalized map of matching NCAA programs.</p>
+      <p className="form-subtitle">Enter your data to generate a personalized map of matching NCAA programs. Distance is estimated from your home state — the more precise your location, the more accurate your results.</p>
 
       {error && <div className="form-error">{error}</div>}
 
@@ -49,7 +45,7 @@ export default function QuickListForm({ athlete, onChange, onAwardChange, onSubm
           <div className="form-section-head">{sec.title}</div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12 }}>
             {sec.fields.map(f => (
-              <div key={f.key} className="form-field">
+              <div key={f.key} className="form-field" style={f.key === "sat" ? { gridColumn: "1 / span 2" } : {}}>
                 <label>{f.label}</label>
                 {f.type === "select"
                   ? <select value={athlete[f.key]} onChange={e => set(f.key, e.target.value)}>

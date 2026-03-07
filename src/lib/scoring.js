@@ -1,4 +1,4 @@
-import { ATH_STANDARDS, RECRUIT_BUDGETS, TIER_ORDER, SAT_PERCENTILES } from "./constants.js";
+import { ATH_STANDARDS, RECRUIT_BUDGETS, TIER_ORDER, SAT_PERCENTILES, STATE_CENTROIDS } from "./constants.js";
 
 export function haversine(lat1, lng1, lat2, lng2) {
   const R = 3959;
@@ -11,13 +11,12 @@ export function haversine(lat1, lng1, lat2, lng2) {
 }
 
 // Standard normal CDF — matches Google Sheets NORM.DIST(x, mean, σ, TRUE)
+// Uses A&S 7.1.26: erfc(x) ≈ poly(t)*exp(-x²), t=1/(1+p·x), x=|z|/√2
 function normCDF(z) {
-  const a = [0.254829592, -0.284496736, 1.421413741, -1.453152027, 1.061405429];
-  const p = 0.3275911;
-  const sign = z < 0 ? -1 : 1;
-  const t = 1 / (1 + p * Math.abs(z));
-  const y = 1 - (((((a[4]*t + a[3])*t + a[2])*t + a[1])*t + a[0])*t) * Math.exp(-z*z);
-  return 0.5 * (1 + sign * y);
+  const x = Math.abs(z) / Math.SQRT2;
+  const t = 1 / (1 + 0.3275911 * x);
+  const erfc = ((((1.061405429*t - 1.453152027)*t + 1.421413741)*t - 0.284496736)*t + 0.254829592) * t * Math.exp(-x * x);
+  return z >= 0 ? 1 - erfc / 2 : erfc / 2;
 }
 
 // Parse "$85,960.00" or "85960" → number
@@ -91,7 +90,7 @@ export function calcEFC(agi, deps, control, schoolType) {
 
 export function runQuickList(athlete, schools, trackerMap = {}) {
   const { position, height, weight, speed40, awards, gpa, sat,
-          hsLat, hsLng, agi, dependents } = athlete;
+          hsLat, hsLng, state, agi, dependents } = athlete;
 
   const boost = calcAthleticBoost(awards);
   const athFit = {};
@@ -103,16 +102,25 @@ export function runQuickList(athlete, schools, trackerMap = {}) {
   const recruitReach = topTier ? RECRUIT_BUDGETS[topTier] : 450;
 
   // Athlete academic scores — matching GrittyOS acad_standards_test logic
-  const satAchieve = sat ? getSATPercentile(+sat) : 0;
-  const gpaPct     = gpa ? getGPAPercentile(+gpa) : 0;
-  const acadRigorScore   = sat ? (satAchieve + gpaPct) / 2 : gpaPct * 0.85;
+  const satScore   = sat ? +sat : 1000; // default to 1000 if not provided
+  const satAchieve = getSATPercentile(satScore);
+  const gpaPct     = gpa ? getGPAPercentile(+gpa) : 0.3;
+  const acadRigorScore   = (satAchieve + gpaPct) / 2;
   const acadTestOptScore = gpaPct;
+
+  // Resolve athlete lat/lng: explicit entry first, then state centroid fallback
+  let refLat = hsLat ? +hsLat : 0;
+  let refLng = hsLng ? +hsLng : 0;
+  if ((!refLat || !refLng) && state) {
+    const centroid = STATE_CENTROIDS[state.toUpperCase().trim()];
+    if (centroid) { refLat = centroid[0]; refLng = centroid[1]; }
+  }
 
   const scored = schools.map(school => {
     const lat = parseFloat(school.LATITUDE || school.Lat);
     const lng = parseFloat(school.LONGITUDE || school.Lng);
-    const dist = (lat && lng && hsLat && hsLng)
-      ? haversine(+hsLat, +hsLng, lat, lng) : 9999;
+    const dist = (lat && lng && refLat && refLng)
+      ? haversine(refLat, refLng, lat, lng) : 9999;
 
     // Athletic tier match: school.Type = "Power 4", "G5", "1-FCS", "2-Div II", "3-Div III"
     const tierMatch = topTier !== null && school.Type === topTier;
