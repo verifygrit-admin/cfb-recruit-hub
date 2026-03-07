@@ -8,6 +8,54 @@ const TIER_LABELS = {
 
 const METRIC_LABELS = { hScore: "Height", wScore: "Weight", sScore: "40-Yard Dash" };
 
+// Position suggestion pools — only suggest analogous roles by position group
+const OFF_SKILL = ["QB", "RB", "FB", "WR"];
+const OFF_LINE  = ["OL", "C", "G", "T"];
+const DEF_SKILL = ["CB", "S"];
+const DEF_LINE  = ["DL", "DE", "DT", "EDGE"];
+const SUGGESTION_POOLS = {
+  QB:   [...OFF_SKILL, "TE", ...DEF_SKILL, "LB"],
+  RB:   [...OFF_SKILL, "TE", ...DEF_SKILL, "LB"],
+  FB:   [...OFF_SKILL, "TE", ...DEF_SKILL, "LB"],
+  WR:   [...OFF_SKILL, "TE", ...DEF_SKILL, "LB"],
+  TE:   [...OFF_SKILL, ...OFF_LINE, ...DEF_SKILL, ...DEF_LINE, "LB"], // crossover
+  OL:   [...OFF_LINE, ...DEF_LINE, "LB"],
+  C:    [...OFF_LINE, ...DEF_LINE, "LB"],
+  G:    [...OFF_LINE, ...DEF_LINE, "LB"],
+  T:    [...OFF_LINE, ...DEF_LINE, "LB"],
+  CB:   [...DEF_SKILL, "LB", ...OFF_SKILL, "TE"],
+  S:    [...DEF_SKILL, "LB", ...OFF_SKILL, "TE"],
+  LB:   [...DEF_SKILL, ...DEF_LINE, ...OFF_LINE],                     // crossover
+  DL:   [...DEF_LINE, "LB", ...OFF_LINE],
+  DE:   [...DEF_LINE, "LB", ...OFF_LINE],
+  DT:   [...DEF_LINE, "LB", ...OFF_LINE],
+  EDGE: [...DEF_LINE, "LB", ...OFF_LINE],
+};
+
+// Concrete training tips keyed by weakest metric
+const TRAINING_TIPS = {
+  wScore: [
+    { title: "Eat in a daily caloric surplus", body: "Add 300–500 calories above your maintenance level. Focus on lean protein (chicken, eggs, tuna, beans), complex carbs (rice, oats, sweet potato), and healthy fats (peanut butter, avocado, whole eggs). Aim for 0.8–1g of protein per lb of bodyweight every day." },
+    { title: "Compound lifts 3–4x per week", body: "Squat, deadlift, bench press, and power clean recruit the most muscle mass in the least time. Start with a 5x5 program (free at stronglifts.com) and add weight to the bar each session. Consistency beats intensity." },
+    { title: "Eat within 30 minutes post-workout", body: "Protein + carbs immediately after lifting accelerates muscle synthesis. Two eggs and a banana, a glass of chocolate milk, or Greek yogurt with fruit are cheap and highly effective options." },
+    { title: "Prioritize sleep — 8 to 9 hours", body: "The majority of muscle growth happens during sleep, not in the gym. Cutting sleep short limits the gains from every workout. This is the highest-ROI, zero-cost training variable most athletes underuse." },
+    { title: "Track your food for two weeks", body: "Most athletes significantly underestimate their daily intake. Use a free app like Cronometer or MyFitnessPal for two weeks to confirm you are actually eating above maintenance — not just thinking you are." },
+  ],
+  sScore: [
+    { title: "Fix your sprint mechanics first", body: "Most speed gains come from technique, not fitness. Focus on a powerful drive phase, tall hips, and straight arm drive. Film yourself or ask a coach to review one session. Bad mechanics permanently cap your ceiling regardless of conditioning." },
+    { title: "Hill sprints or resistance sprints 2x per week", body: "Find a moderate incline and sprint up it at 100% effort with full recovery between reps. Uphill and resistance sprinting builds the explosive acceleration phase that most directly reduces 40 time. 6–8 reps per session is enough." },
+    { title: "Plyometrics 2x per week", body: "Box jumps, broad jumps, and bounding drills train your fast-twitch muscle fibers — the same fibers that drive sprint speed. Three sets of 5 reps twice weekly is sufficient stimulus. Quality of effort matters more than volume." },
+    { title: "Power cleans and trap bar deadlifts", body: "Research consistently shows hip-dominant explosive lifts have the strongest correlation with sprint speed. If these are not in your program, add them. Even one day per week produces measurable speed improvements over 8–12 weeks." },
+    { title: "Sprint at full speed every rep in practice", body: "Speed is a skill trained at the speed you practice. Jogging through reps teaches your nervous system to jog. Sprint every drill that calls for it — your nervous system adapts to the stimulus you give it." },
+  ],
+  hScore: [
+    { title: "Height is genetic — focus on what you can control", body: "The height score reflects the position median, not a hard cutoff. Meaningful improvements to your speed or weight scores can raise your overall athletic score enough to qualify even with the same height. Those are your levers." },
+    { title: "Posture and core work can maximize your measured height", body: "Dead hangs (hang from a bar 30–60 seconds daily), thoracic mobility drills, and plank progressions correct forward lean over time. Athletes with poor posture can gain 0.5–1 inch in measured standing height through consistent postural work." },
+    { title: "Consider positions with a lower height median", body: "The alternative positions shown above were selected partly because their height medians are closer to yours. Your overall score is naturally stronger there with identical measurables — and those are real options, not consolation prizes." },
+    { title: "Technique closes the gap that inches can't", body: "Route precision, hand fighting, leverage, and positional IQ are things coaches weigh heavily but pre-recruit metrics don't capture. Developing elite technique at your position makes height a smaller factor than it appears on paper." },
+  ],
+};
+
 const CLASS_LABELS = { Senior: "Senior", Junior: "Junior", Soph: "Sophomore", Freshman: "Freshman" };
 
 const ACADEMIC_TIPS = [
@@ -168,10 +216,12 @@ export default function StayGrittyModal({ results, athlete, onEditProfile, onBro
   if (comps?.hScore > 0.5) strengths.push(`Height: ${(comps.hScore * 100).toFixed(0)}%`);
   if (comps?.wScore > 0.5) strengths.push(`Weight: ${(comps.wScore * 100).toFixed(0)}%`);
 
-  // Alternative positions at D3 that would qualify with current measurables
+  // Alternative positions at D3 — filtered to analogous position group
   const boost = results.boost || 0;
+  const pool = SUGGESTION_POOLS[athlete.position] || [];
   const altPositions = POSITIONS.filter(pos =>
     pos !== athlete.position &&
+    pool.includes(pos) &&
     ATH_STANDARDS["3-Div III"]?.[pos] &&
     calcAthleticFit(pos, +athlete.height, +athlete.weight, +athlete.speed40, "3-Div III") + boost > 0.5
   ).slice(0, 4);
@@ -277,18 +327,35 @@ export default function StayGrittyModal({ results, athlete, onEditProfile, onBro
           )}
         </div>
 
-        {/* Stay Gritty focus */}
+        {/* Stay Gritty focus + training tips */}
         {weakest && (
-          <div style={{ marginBottom: 20, padding: "12px 16px", background: "#130f08", border: "1px solid #3a2e10", borderRadius: 4 }}>
-            <div style={{ fontSize: 10, letterSpacing: 2, color: "#f5a623", fontWeight: 700, textTransform: "uppercase", marginBottom: 6 }}>
-              Stay Gritty Focus
+          <div style={{ marginBottom: 20 }}>
+            <div style={{ padding: "12px 16px", background: "#130f08", border: "1px solid #3a2e10", borderRadius: 4, marginBottom: 12 }}>
+              <div style={{ fontSize: 10, letterSpacing: 2, color: "#f5a623", fontWeight: 700, textTransform: "uppercase", marginBottom: 6 }}>
+                Stay Gritty Focus: {METRIC_LABELS[weakest[0]]}
+              </div>
+              <div style={{ fontSize: 13, color: "#6b8c72", fontFamily: "'Barlow', sans-serif", lineHeight: 1.6 }}>
+                Your <strong style={{ color: "#f5a623" }}>{METRIC_LABELS[weakest[0]]}</strong> is
+                the primary metric holding you back. Close the gap between your current number and
+                the {tierLabel} median and your qualifying score will follow.
+                Update your profile when you've made progress — your results will refresh automatically.
+              </div>
             </div>
-            <div style={{ fontSize: 13, color: "#6b8c72", fontFamily: "'Barlow', sans-serif", lineHeight: 1.6 }}>
-              Your <strong style={{ color: "#f5a623" }}>{METRIC_LABELS[weakest[0]]}</strong> is
-              the primary metric holding you back. Close the gap between your current number and
-              the {tierLabel} median and your qualifying score will follow.
-              Update your profile when you've made progress — your results will refresh automatically.
-            </div>
+            {TRAINING_TIPS[weakest[0]] && (
+              <div>
+                <div style={{ fontSize: 10, letterSpacing: 2, color: "#6ed430", fontWeight: 700, textTransform: "uppercase", marginBottom: 10 }}>
+                  How to Improve Your {METRIC_LABELS[weakest[0]]}
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  {TRAINING_TIPS[weakest[0]].map(tip => (
+                    <div key={tip.title} style={{ paddingLeft: 12, borderLeft: "2px solid #2e6b18" }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: "#c8f5a0", marginBottom: 2, letterSpacing: 0.5 }}>{tip.title}</div>
+                      <div style={{ fontSize: 12, color: "#6b8c72", fontFamily: "'Barlow', sans-serif", lineHeight: 1.5 }}>{tip.body}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
