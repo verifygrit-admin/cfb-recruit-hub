@@ -192,7 +192,7 @@ select:focus { outline: none; border-color: var(--accent); }
 .state-search-wrap { position: relative; }
 
 /* ── MODE TOGGLE ───────────────────────────────────────────────────── */
-.mode-toggle {
+.mode-toggle--btns {
   display: flex; align-items: center; gap: 3px;
   background: var(--bg); border: 1px solid var(--border); border-radius: 5px; padding: 3px;
 }
@@ -210,6 +210,23 @@ select:focus { outline: none; border-color: var(--accent); }
   transition: all 0.15s;
 }
 .mode-btn.active { background: var(--accent); color: #000; font-weight: 700; }
+
+.mode-toggle--select {
+  display: none;
+  width: auto;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  color: var(--accent);
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  padding: 6px 28px 6px 10px;
+  cursor: pointer;
+  text-transform: uppercase;
+  min-width: 140px;
+}
 
 /* ── PANEL TOGGLE ──────────────────────────────────────────────────── */
 .panel-toggle {
@@ -600,6 +617,11 @@ select:focus { outline: none; border-color: var(--accent); }
 .tut-support a { color: var(--muted); text-decoration: underline; }
 .tut-support a:hover { color: var(--accent); }
 
+@media (max-width: 640px) {
+  .mode-toggle--btns   { display: none; }
+  .mode-toggle--select { display: block; }
+}
+
 @media (max-width: 768px) {
   #drawerToggle { display: flex; }
   .header-title { display: none; }
@@ -628,7 +650,6 @@ select:focus { outline: none; border-color: var(--accent); }
 @media (max-width: 480px) {
   .header-divider { display: none; }
   .ql-metric { min-width: 100%; }
-  .mode-btn { padding: 6px 8px; font-size: 10px; letter-spacing: 0.5px; }
   /* Form: single column on small phones */
   .form-grid { grid-template-columns: 1fr; }
   /* Summary bar stats: tighten on small screens */
