@@ -33,6 +33,7 @@ export default function MapView({ schools, results, mode, filters, shortListIds 
       center: [38.5, -96],
       zoom: 4,
       zoomControl: true,
+      tap: false,  // prevents Leaflet's custom tap handler from re-firing and closing popups on mobile
     });
     L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
       attribution: '&copy; <a href="https://carto.com/">CARTO</a>',
