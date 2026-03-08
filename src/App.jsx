@@ -8,7 +8,8 @@ import Sidebar from "./components/Sidebar.jsx";
 import Tutorial from "./components/Tutorial.jsx";
 import HelmetAnim from "./components/HelmetAnim.jsx";
 import StayGrittyModal from "./components/StayGrittyModal.jsx";
-import { fetchSchools, fetchTracker, saveRecruit, updateRecruit, geocodeHighSchool, saveShortList } from "./lib/api.js";
+import AuthModal from "./components/AuthModal.jsx";
+import { fetchSchools, fetchTracker, saveRecruit, updateRecruit, geocodeHighSchool, saveShortList, validateToken, signOut } from "./lib/api.js";
 import { runQuickList, getClassLabel } from "./lib/scoring.js";
 
 const BLANK_ATHLETE = {
@@ -48,16 +49,22 @@ export default function App() {
   const [savedIdentity, setSavedIdentity]   = useState(null);   // { name, email } at save time
   const [stayGrittyData, setStayGrittyData] = useState(null);   // results when topTier === null
   const [shortList, setShortList]           = useState([]);     // My Short List schools
-  const browseAnimShown = useRef(false);
-  const qlAnimShown     = useRef(false);
+  const [auth, setAuth]                     = useState(null);   // { said, email, sessionToken } or null
+  const [pendingAuth, setPendingAuth]       = useState(null);   // { res } waiting for auth
+  const browseAnimShown   = useRef(false);
+  const qlAnimShown       = useRef(false);
+  const restoreSessionRef = useRef(null);   // profile to re-run after schools load
 
   useEffect(() => {
     fetchSchools()
       .then(s => { setSchools(s); setDataLoaded(true); })
       .catch(e => setDataError(e.message));
     fetchTracker().then(setTracker).catch(() => {});
-    // Restore SAID + short list from localStorage on mount
-    const savedSaid = localStorage.getItem("cfb_said");
+
+    // Restore session + short list from localStorage on mount
+    const savedSaid  = localStorage.getItem("cfb_said");
+    const savedToken = localStorage.getItem("cfb_session_token");
+
     if (savedSaid) {
       setSaid(savedSaid);
       try {
@@ -65,6 +72,36 @@ export default function App() {
         if (sl) setShortList(JSON.parse(sl));
       } catch {}
     }
+
+    // Validate session token if both present
+    if (savedSaid && savedToken) {
+      validateToken(savedSaid, savedToken).then(r => {
+        if (r.ok) {
+          setAuth({ said: savedSaid, email: r.email, sessionToken: savedToken });
+          if (r.profile) {
+            const p = r.profile;
+            const restored = {
+              name: p.name || "", highSchool: p.highSchool || "",
+              gradYear: p.gradYear || "", email: p.email || "",
+              phone: p.phone || "", twitter: p.twitter || "",
+              position: p.position || "", height: p.height || "",
+              weight: p.weight || "", speed40: p.speed40 || "",
+              gpa: p.gpa || "", sat: p.sat || "",
+              state: p.state || "",
+              hsLat: p.hsLat || null, hsLng: p.hsLng || null, geoLabel: null,
+              agi: p.agi || "", dependents: p.dependents || "",
+              awards: p.awards || { expectedStarter: false, captain: false, allConference: false, allState: false },
+            };
+            setAthlete(restored);
+            setSavedIdentity({ name: p.name, email: p.email });
+            restoreSessionRef.current = p;  // signal restore when schools load
+          }
+        } else {
+          localStorage.removeItem("cfb_session_token");
+        }
+      }).catch(() => {});
+    }
+
     // Show browse helmet animation on first load
     if (!browseAnimShown.current) {
       browseAnimShown.current = true;
@@ -79,6 +116,32 @@ export default function App() {
       setShowQLAnim(true);
     }
   }, [results]);
+
+  // Auto-restore GRIT Fit results when schools load after a valid session restore
+  useEffect(() => {
+    if (!dataLoaded || !schools.length || !restoreSessionRef.current) return;
+    const p = restoreSessionRef.current;
+    restoreSessionRef.current = null;
+    if (!p.name || !p.position || !p.height) return;
+    const parsed = {
+      name: p.name, highSchool: p.highSchool || "", gradYear: p.gradYear || "",
+      email: p.email || "", state: p.state || "",
+      position: p.position, height: +p.height || 0, weight: +p.weight || 0,
+      speed40: +p.speed40 || 0,
+      gpa: p.gpa ? +p.gpa : null, sat: p.sat ? +p.sat : null,
+      hsLat: p.hsLat || null, hsLng: p.hsLng || null,
+      agi: p.agi ? +p.agi : null,
+      dependents: p.dependents ? (p.dependents === "4+" ? 4 : +p.dependents) : null,
+      awards: p.awards || { expectedStarter: false, captain: false, allConference: false, allState: false },
+    };
+    const res = runQuickList(parsed, schools, tracker);
+    if (res.topTier && res.top50.length > 0) {
+      setResults(res);
+      setMode("quicklist");
+      setPanel("map");
+      // Don't show the results intro modal on session restore
+    }
+  }, [dataLoaded, schools, tracker]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Persist SAID + short list to localStorage; debounce Sheet sync
   useEffect(() => {
@@ -174,6 +237,31 @@ export default function App() {
     setAthlete(a => ({ ...a, awards: { ...a.awards, [key]: val } }));
   }, []);
 
+  function revealResults(res) {
+    setResults(res);
+    setMode("quicklist");
+    setPanel("map");
+    setShowResultsModal(true);
+  }
+
+  function handleAuthComplete({ said: authSaid, email: authEmail, sessionToken }) {
+    setAuth({ said: authSaid, email: authEmail, sessionToken });
+    localStorage.setItem("cfb_session_token", sessionToken);
+    setSaid(authSaid);
+    setSavedIdentity(prev => prev ? { ...prev, email: authEmail } : { name: athlete.name, email: authEmail });
+    setPendingAuth(prev => {
+      if (prev?.res) revealResults(prev.res);
+      return null;
+    });
+  }
+
+  function handleLogout() {
+    if (!auth) return;
+    signOut(auth.said, auth.sessionToken).catch(() => {});
+    setAuth(null);
+    localStorage.removeItem("cfb_session_token");
+  }
+
   async function handleSubmit(forceNew = false) {
     setError(null);
     const { name, highSchool, gradYear, email, position, height, weight, speed40, state, gpa } = athlete;
@@ -208,31 +296,32 @@ export default function App() {
       const res = runQuickList(parsed, schools, tracker);
 
       if (!res.topTier || res.top50.length === 0) {
-        // No qualifying tier OR no schools passed all gates — show Stay Gritty modal
         setStayGrittyData(res);
         saveRecruit({ ...parsed, timestamp: new Date().toISOString() }).catch(() => {});
         return;
       }
 
-      setResults(res);
-      setMode("quicklist");
-      setPanel("map");
-      setShowResultsModal(true);
-
-      // Determine whether to update existing record or insert new one
-      const identityChanged = savedIdentity &&
-        (athlete.name !== savedIdentity.name || athlete.email !== savedIdentity.email);
-
-      if (!forceNew && said && !identityChanged) {
-        // Update existing record
-        updateRecruit({ ...parsed, said, timestamp: new Date().toISOString() })
-          .catch(() => {});
+      if (auth) {
+        // Already authenticated — show results immediately, save in background
+        revealResults(res);
+        const identityChanged = savedIdentity &&
+          (athlete.name !== savedIdentity.name || athlete.email !== savedIdentity.email);
+        if (!forceNew && said && !identityChanged) {
+          updateRecruit({ ...parsed, said, timestamp: new Date().toISOString() }).catch(() => {});
+        } else {
+          saveRecruit({ ...parsed, timestamp: new Date().toISOString() })
+            .then(r => { if (r?.said) { setSaid(r.said); setSavedIdentity({ name: athlete.name, email: athlete.email }); } })
+            .catch(() => {});
+        }
       } else {
-        // New insert
-        setSaid(null); // clear optimistically; will be set from response
-        saveRecruit({ ...parsed, timestamp: new Date().toISOString() })
-          .then(r => { if (r?.said) { setSaid(r.said); setSavedIdentity({ name: athlete.name, email: athlete.email }); } })
-          .catch(() => {});
+        // Gate on auth — save first to get SAID, then show modal
+        const r = await saveRecruit({ ...parsed, timestamp: new Date().toISOString() });
+        const newSaid = r?.said || null;
+        if (newSaid) {
+          setSaid(newSaid);
+          setSavedIdentity({ name: athlete.name, email: athlete.email });
+        }
+        setPendingAuth({ res });
       }
     } catch (e) {
       setError(e.message);
@@ -242,12 +331,15 @@ export default function App() {
   }
 
   function handleNewProfile() {
-    setSaid(null);
-    setSavedIdentity(null);
     setResults(null);
     setAthlete(BLANK_ATHLETE);
-    setShortList([]);
-    localStorage.removeItem("cfb_said");
+    setSavedIdentity(null);
+    if (!auth) {
+      // Only wipe identity + shortList when not logged in
+      setSaid(null);
+      setShortList([]);
+      localStorage.removeItem("cfb_said");
+    }
     setMode("quicklist");
   }
 
@@ -308,7 +400,15 @@ export default function App() {
               ))}
             </div>
           )}
-          <ModeToggle mode={mode} onChange={m => { setMode(m); if (m === "browse") setPanel("map"); }} />
+          <ModeToggle
+            mode={mode}
+            auth={auth}
+            onChange={m => {
+              if (m === "__logout") { handleLogout(); return; }
+              setMode(m);
+              if (m === "browse") setPanel("map");
+            }}
+          />
           {isBrowse && (
             <button id="tutHelpBtn" className="help-btn" onClick={() => { setTutorialType("browse"); setShowTutorial(true); }} aria-label="Help">?</button>
           )}
@@ -460,6 +560,15 @@ export default function App() {
           athlete={athlete}
           onEditProfile={() => setStayGrittyData(null)}
           onBrowse={() => { setStayGrittyData(null); setMode("browse"); }}
+        />
+      )}
+
+      {pendingAuth && (
+        <AuthModal
+          initialView="createAccount"
+          prefillEmail={athlete.email}
+          said={said}
+          onAuth={handleAuthComplete}
         />
       )}
 

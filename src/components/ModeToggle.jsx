@@ -4,20 +4,27 @@ const MODES = [
   { id: "shortlist", label: "My Short List"  },
 ];
 
-export default function ModeToggle({ mode, onChange }) {
+export default function ModeToggle({ mode, onChange, auth }) {
   return (
     <>
-      {/* Desktop: pill button group */}
-      <div className="mode-toggle mode-toggle--btns">
-        {MODES.map(({ id, label }) => (
-          <button
-            key={id}
-            className={`mode-btn${mode === id ? " active" : ""}`}
-            onClick={() => onChange(id)}
-          >
-            {label}
+      {/* Desktop: pill button group + sign out */}
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <div className="mode-toggle mode-toggle--btns">
+          {MODES.map(({ id, label }) => (
+            <button
+              key={id}
+              className={`mode-btn${mode === id ? " active" : ""}`}
+              onClick={() => onChange(id)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        {auth && (
+          <button className="signout-btn" onClick={() => onChange("__logout")}>
+            Sign Out
           </button>
-        ))}
+        )}
       </div>
 
       {/* Mobile: native select */}
@@ -30,6 +37,7 @@ export default function ModeToggle({ mode, onChange }) {
         {MODES.map(({ id, label }) => (
           <option key={id} value={id}>{label}</option>
         ))}
+        {auth && <option value="__logout">— Sign Out</option>}
       </select>
     </>
   );

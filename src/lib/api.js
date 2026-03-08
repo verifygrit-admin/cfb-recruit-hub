@@ -73,6 +73,63 @@ export async function updateRecruit(profile) {
   return res.json();
 }
 
+export async function createAccount(email, password, said) {
+  if (!API_BASE) throw new Error("VITE_API_BASE not set.");
+  const res = await fetch(`${API_BASE}?action=createAccount`, {
+    method: "POST",
+    body: JSON.stringify({ email, password, said, userAgent: navigator.userAgent }),
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+export async function signIn(email, password) {
+  if (!API_BASE) throw new Error("VITE_API_BASE not set.");
+  const res = await fetch(`${API_BASE}?action=signIn`, {
+    method: "POST",
+    body: JSON.stringify({ email, password, userAgent: navigator.userAgent }),
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+export async function validateToken(said, token) {
+  if (!API_BASE || !said || !token) return { ok: false };
+  const res = await fetch(`${API_BASE}?action=validateToken&said=${encodeURIComponent(said)}&token=${encodeURIComponent(token)}`);
+  if (!res.ok) return { ok: false };
+  return res.json();
+}
+
+export async function signOut(said, token) {
+  if (!API_BASE || !said) return;
+  const res = await fetch(`${API_BASE}?action=signOut`, {
+    method: "POST",
+    body: JSON.stringify({ said, token, userAgent: navigator.userAgent }),
+  });
+  if (!res.ok) return;
+  return res.json();
+}
+
+export async function forgotPassword(email) {
+  if (!API_BASE) throw new Error("VITE_API_BASE not set.");
+  const res = await fetch(`${API_BASE}?action=forgotPassword`, {
+    method: "POST",
+    body: JSON.stringify({ email }),
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+export async function resetPassword(email, code, newPassword) {
+  if (!API_BASE) throw new Error("VITE_API_BASE not set.");
+  const res = await fetch(`${API_BASE}?action=resetPassword`, {
+    method: "POST",
+    body: JSON.stringify({ email, code, newPassword, userAgent: navigator.userAgent }),
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
 export async function saveShortList(said, schools) {
   if (!API_BASE || !said) return;
   const res = await fetch(`${API_BASE}?action=saveShortList`, {
