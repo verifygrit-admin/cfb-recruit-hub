@@ -643,6 +643,18 @@ export default function App() {
           said={said}
           onAuth={handleAuthComplete}
           onDismiss={() => setShowAuthModal(false)}
+          onCreateNew={() => {
+            setShowAuthModal(false);
+            // Clear any existing session — fresh start
+            setSaid(null);
+            setSavedIdentity(null);
+            setAthlete(BLANK_ATHLETE);
+            setShortList([]);
+            localStorage.removeItem("cfb_said");
+            // Send to My GRIT Fit with context
+            setMode("quicklist");
+            setGritFitPrompt("Complete your Student-Athlete Profile to save schools to your Short List and generate your personalized GRIT Fit results.");
+          }}
         />
       )}
 

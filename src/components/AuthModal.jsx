@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { createAccount, signIn, forgotPassword, resetPassword } from "../lib/api.js";
 
-export default function AuthModal({ initialView = "createAccount", prefillEmail = "", said, onAuth, onDismiss }) {
+export default function AuthModal({ initialView = "createAccount", prefillEmail = "", said, onAuth, onDismiss, onCreateNew }) {
   const [view, setView]             = useState(initialView);
   const [email, setEmail]           = useState(prefillEmail);
   const [password, setPassword]     = useState("");
@@ -128,7 +128,7 @@ export default function AuthModal({ initialView = "createAccount", prefillEmail 
             <div className="auth-switch">
               <button onClick={() => switchView("forgotPassword")}>Forgot password?</button>
               {said && (
-                <> &nbsp;·&nbsp; <button onClick={() => switchView("createAccount")}>Create new account</button></>
+                <> &nbsp;·&nbsp; <button onClick={() => onCreateNew ? onCreateNew() : switchView("createAccount")}>Create new account</button></>
               )}
             </div>
           </>
