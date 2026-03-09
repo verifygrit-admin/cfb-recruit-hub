@@ -196,7 +196,7 @@ function AcademicContent({ results, athlete, onEditProfile, onBrowse }) {
             padding: "10px 20px", background: "transparent", border: "1px solid #2e6b18",
             borderRadius: 3, color: "#6b8c72", fontFamily: "'Barlow Condensed', sans-serif",
             fontSize: 13, fontWeight: 700, letterSpacing: 1, cursor: "pointer",
-          }}>Browse Schools</button>
+          }}>Home</button>
         </div>
       </div>
     </div>
@@ -504,7 +504,7 @@ export default function StayGrittyModal({ results, athlete, onEditProfile, onBro
             padding: "10px 20px", background: "transparent", border: "1px solid #2e6b18",
             borderRadius: 3, color: "#6b8c72", fontFamily: "'Barlow Condensed', sans-serif",
             fontSize: 13, fontWeight: 700, letterSpacing: 1, cursor: "pointer",
-          }}>Browse Schools</button>
+          }}>Home</button>
         </div>
 
       </div>

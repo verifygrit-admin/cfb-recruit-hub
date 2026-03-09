@@ -149,7 +149,7 @@ const QL_SLIDES = [
         <li><strong>Recruit Quest.</strong> — submit your recruiting questionnaire directly to the school's coaches</li>
         <li><strong>Coaching Staff</strong> — view the football staff directory to identify who to contact</li>
         <li>Use <strong>Edit Profile</strong> in the summary bar to adjust your data and rerun</li>
-        <li>Switch back to <strong>Browse Schools</strong> to explore programs freely</li>
+        <li>Switch back to <strong>Home</strong> to explore programs freely</li>
       </ul>
     ),
     tip: "Submitting your questionnaire is the single highest-impact action a recruit can take.",

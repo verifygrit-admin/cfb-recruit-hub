@@ -1,5 +1,5 @@
 const MODES = [
-  { id: "browse",    label: "Browse Schools" },
+  { id: "browse",    label: "Home" },
   { id: "quicklist", label: "My GRIT Fit"    },
   { id: "shortlist", label: "My Short List"  },
 ];
