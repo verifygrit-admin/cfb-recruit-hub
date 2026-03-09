@@ -467,6 +467,7 @@ export default function App() {
             auth={auth}
             onChange={m => {
               if (m === "__logout") { handleLogout(); return; }
+              if (m === "__signin") { setAuthModalView("signIn"); setShowAuthModal(true); return; }
               setMode(m);
               if (m === "browse") setPanel("map");
             }}
