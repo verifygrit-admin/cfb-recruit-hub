@@ -2,7 +2,7 @@ import { useState } from "react";
 
 const BROWSE_SLIDES = [
   {
-    num: "01 / 04",
+    num: "01 / 05",
     title: "Welcome to GrittyOS CFB Recruit Hub",
     body: "This map shows every NCAA football program — 661 schools across all divisions. Markers are color-coded by division tier. Click any marker to see program details, recruiting links, and financial data.",
     extra: (
@@ -25,7 +25,7 @@ const BROWSE_SLIDES = [
     tip: null,
   },
   {
-    num: "02 / 04",
+    num: "02 / 05",
     title: "Understanding the Data",
     body: "Each school popup shows key metrics to help evaluate fit:",
     extra: (
@@ -46,7 +46,7 @@ const BROWSE_SLIDES = [
     tip: null,
   },
   {
-    num: "03 / 04",
+    num: "03 / 05",
     title: "Filtering & Browsing",
     body: "Use the left sidebar to narrow your search:",
     extra: (
@@ -62,7 +62,7 @@ const BROWSE_SLIDES = [
     tip: "On mobile, tap the menu button to open the filter panel.",
   },
   {
-    num: "04 / 04",
+    num: "04 / 05",
     title: "My GRIT Fit",
     body: "Switch to MY GRIT FIT in the top-right to enter your athlete profile. The GRIT FIT Formula scores every program against your athletic metrics, academic scores, location, and financial data.",
     extra: (
@@ -74,6 +74,25 @@ const BROWSE_SLIDES = [
       </ul>
     ),
     tip: "Your profile data is saved to help coaches connect with you.",
+  },
+  {
+    num: "05 / 05",
+    title: "Choose Your Path",
+    body: "GrittyOS gives you two ways to engage — pick the one that fits where you are right now:",
+    extra: (
+      <div className="tut-defs">
+        {[
+          { term: "Explore the Map", desc: "Browse all 661 programs, access recruiting questionnaires, and find coaching staff contacts — no account needed." },
+          { term: "Get My GRIT Fit — Free", desc: "Create a free account to run the GRIT FIT Formula: personalized recruiting matches scored against your athletic profile, academics, location, and finances." },
+        ].map(({ term, desc }) => (
+          <div key={term} className="tut-def-row">
+            <div className="tut-def-term">{term}</div>
+            <div className="tut-def-desc">{desc}</div>
+          </div>
+        ))}
+      </div>
+    ),
+    tip: null,
   },
 ];
 
@@ -170,7 +189,7 @@ const QL_SLIDES = [
   },
 ];
 
-export default function Tutorial({ type = "browse", onClose }) {
+export default function Tutorial({ type = "browse", onClose, onGritFit }) {
   const [idx, setIdx] = useState(0);
   const slides = type === "quicklist" ? QL_SLIDES : BROWSE_SLIDES;
   const slide  = slides[idx];
@@ -205,7 +224,14 @@ export default function Tutorial({ type = "browse", onClose }) {
           </div>
           {idx < slides.length - 1
             ? <button onClick={() => setIdx(i => i + 1)} style={{ padding: "7px 18px", background: "#6ed430", border: "none", borderRadius: 3, color: "#000", cursor: "pointer", fontFamily: "'Barlow Condensed',sans-serif", fontSize: 12, letterSpacing: 1, fontWeight: 700 }}>Next →</button>
-            : <button onClick={onClose} style={{ padding: "7px 18px", background: "#6ed430", border: "none", borderRadius: 3, color: "#000", cursor: "pointer", fontFamily: "'Barlow Condensed',sans-serif", fontSize: 12, letterSpacing: 1, fontWeight: 700 }}>Get Started →</button>
+            : type === "browse" && onGritFit
+              ? (
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button onClick={onClose} style={{ padding: "7px 14px", background: "transparent", border: "1px solid #6b8c72", borderRadius: 3, color: "#6b8c72", cursor: "pointer", fontFamily: "'Barlow Condensed',sans-serif", fontSize: 12, letterSpacing: 1 }}>Explore Map</button>
+                  <button onClick={onGritFit} style={{ padding: "7px 14px", background: "#6ed430", border: "none", borderRadius: 3, color: "#000", cursor: "pointer", fontFamily: "'Barlow Condensed',sans-serif", fontSize: 12, letterSpacing: 1, fontWeight: 700 }}>Get GRIT Fit →</button>
+                </div>
+              )
+              : <button onClick={onClose} style={{ padding: "7px 18px", background: "#6ed430", border: "none", borderRadius: 3, color: "#000", cursor: "pointer", fontFamily: "'Barlow Condensed',sans-serif", fontSize: 12, letterSpacing: 1, fontWeight: 700 }}>Get Started →</button>
           }
         </div>
       </div>

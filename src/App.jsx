@@ -634,6 +634,7 @@ export default function App() {
           prefillEmail={athlete.email}
           said={said}
           onAuth={handleAuthComplete}
+          onReturn={() => { setPendingAuth(null); setMode("browse"); }}
         />
       )}
       {showAuthModal && !pendingAuth && (
@@ -643,6 +644,7 @@ export default function App() {
           said={said}
           onAuth={handleAuthComplete}
           onDismiss={() => setShowAuthModal(false)}
+          onReturn={() => setShowAuthModal(false)}
           onCreateNew={() => {
             setShowAuthModal(false);
             // Clear any existing session — fresh start
@@ -658,7 +660,17 @@ export default function App() {
         />
       )}
 
-      {showTutorial && <Tutorial type={tutorialType} onClose={() => setShowTutorial(false)} />}
+      {showTutorial && (
+        <Tutorial
+          type={tutorialType}
+          onClose={() => setShowTutorial(false)}
+          onGritFit={tutorialType === "browse" ? () => {
+            setShowTutorial(false);
+            setMode("quicklist");
+            setGritFitPrompt(true);
+          } : undefined}
+        />
+      )}
       {showBrowseAnim && (
         <HelmetAnim targetId="tutHelpBtn" onDone={() => {
           setShowBrowseAnim(false);
@@ -666,6 +678,9 @@ export default function App() {
             localStorage.setItem("cfb_browse_tutSeen", "1");
             setTutorialType("browse");
             setShowTutorial(true);
+          } else if (!auth) {
+            setAuthModalView("signIn");
+            setShowAuthModal(true);
           }
         }} />
       )}
