@@ -68,19 +68,21 @@ export default function App() {
     const savedSaid  = localStorage.getItem("cfb_said");
     const savedToken = localStorage.getItem("cfb_session_token");
 
+    // Restore SAID for sign-in banner — but NOT shortList until auth is confirmed
     if (savedSaid) {
       setSaid(savedSaid);
-      try {
-        const sl = localStorage.getItem(`cfb_sl_${savedSaid}`);
-        if (sl) setShortList(JSON.parse(sl));
-      } catch {}
     }
 
-    // Validate session token if both present
+    // Validate session token if both present; only then restore shortList
     if (savedSaid && savedToken) {
       validateToken(savedSaid, savedToken).then(r => {
         if (r.ok) {
           setAuth({ said: savedSaid, email: r.email, sessionToken: savedToken });
+          // Restore short list only after confirmed auth
+          try {
+            const sl = localStorage.getItem(`cfb_sl_${savedSaid}`);
+            if (sl) setShortList(JSON.parse(sl));
+          } catch {}
           if (r.profile) {
             const p = r.profile;
             const restored = {
