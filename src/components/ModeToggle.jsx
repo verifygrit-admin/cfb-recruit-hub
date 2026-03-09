@@ -8,7 +8,7 @@ export default function ModeToggle({ mode, onChange, auth }) {
   return (
     <>
       {/* Desktop: pill button group + sign out */}
-      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+      <div className="mode-toggle-group">
         <div className="mode-toggle mode-toggle--btns">
           {MODES.map(({ id, label }) => (
             <button

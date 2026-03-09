@@ -192,6 +192,9 @@ select:focus { outline: none; border-color: var(--accent); }
 .state-search-wrap { position: relative; }
 
 /* ── MODE TOGGLE ───────────────────────────────────────────────────── */
+.mode-toggle-group {
+  display: flex; align-items: center; gap: 8px;
+}
 .mode-toggle--btns {
   display: flex; align-items: center; gap: 3px;
   background: var(--bg); border: 1px solid var(--border); border-radius: 5px; padding: 3px;
@@ -622,7 +625,7 @@ select:focus { outline: none; border-color: var(--accent); }
 .tut-support a:hover { color: var(--accent); }
 
 @media (max-width: 640px) {
-  .mode-toggle--btns   { display: none; }
+  .mode-toggle-group   { display: none; }   /* hides btn group + sign out btn together */
   .mode-toggle--select { display: block; }
 }
 
