@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { createAccount, signIn, forgotPassword, resetPassword } from "../lib/api.js";
+import { createAccount, signIn, forgotPassword, resetPassword, completePendingAccount } from "../lib/api.js";
 
-export default function AuthModal({ initialView = "createAccount", prefillEmail = "", said, onAuth, onDismiss, onCreateNew, onReturn }) {
+export default function AuthModal({ initialView = "createAccount", prefillEmail = "", said, onAuth, onDismiss, onCreateNew, onReturn, pendingToken }) {
   const [view, setView]             = useState(initialView);
   const [email, setEmail]           = useState(prefillEmail);
   const [password, setPassword]     = useState("");
@@ -22,9 +22,11 @@ export default function AuthModal({ initialView = "createAccount", prefillEmail 
     if (password !== confirmPw) { setError("Passwords do not match."); return; }
     setLoading(true); setError(null);
     try {
-      const r = await createAccount(email, password, said);
+      const r = pendingToken
+        ? await completePendingAccount(said, pendingToken, password)
+        : await createAccount(email, password, said);
       if (r.error) { setError(r.error); return; }
-      onAuth({ said: r.said, email: r.email, sessionToken: r.sessionToken });
+      onAuth({ said: r.said, email: r.email, sessionToken: r.sessionToken, profile: r.profile });
     } catch { setError("Something went wrong. Please try again."); }
     finally { setLoading(false); }
   }

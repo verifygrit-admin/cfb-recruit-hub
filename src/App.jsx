@@ -9,7 +9,7 @@ import Tutorial from "./components/Tutorial.jsx";
 import HelmetAnim from "./components/HelmetAnim.jsx";
 import StayGrittyModal from "./components/StayGrittyModal.jsx";
 import AuthModal from "./components/AuthModal.jsx";
-import { fetchSchools, fetchTracker, saveRecruit, updateRecruit, geocodeHighSchool, saveShortList, getShortList, validateToken, signOut } from "./lib/api.js";
+import { fetchSchools, fetchTracker, saveRecruit, updateRecruit, geocodeHighSchool, saveShortList, getShortList, validateToken, signOut, completePendingAccount, requestEmailChange, confirmEmailChange } from "./lib/api.js";
 import { runQuickList, getClassLabel } from "./lib/scoring.js";
 
 const BLANK_ATHLETE = {
@@ -53,11 +53,19 @@ export default function App() {
   const [pendingAuth, setPendingAuth]       = useState(null);   // { res } waiting for auth
   const [showAuthModal, setShowAuthModal]   = useState(false);  // sign-in-only modal
   const [authModalView, setAuthModalView]   = useState("signIn");
+  const [newProfileMode, setNewProfileMode]       = useState(false);
+  const [pendingNewProfile, setPendingNewProfile] = useState(null);
+  const [showSwitchModal, setShowSwitchModal]     = useState(null);
+  const [showEmailVerify, setShowEmailVerify]     = useState(false);
+  const [emailVerifyState, setEmailVerifyState]   = useState({ newEmail: "", code: "", loading: false, error: null, success: false });
+  const [pendingComplete, setPendingComplete]     = useState(null);
   const [gritFitPrompt, setGritFitPrompt]   = useState(null);   // contextual redirect message
   const browseAnimShown   = useRef(false);
   const qlAnimShown       = useRef(false);
   const restoreSessionRef  = useRef(null);   // profile to re-run after schools load
   const restoreSlRef       = useRef(null);   // SAID to fetch short list from server after schools load
+  const savedResultsRef = useRef(null);
+  const savedAthleteRef = useRef(null);
 
   useEffect(() => {
     fetchSchools()
@@ -119,6 +127,14 @@ export default function App() {
     if (!browseAnimShown.current) {
       browseAnimShown.current = true;
       setShowBrowseAnim(true);
+    }
+    // Check for magic link completion (?completeSAID=...&token=...)
+    const params = new URLSearchParams(window.location.search);
+    const completeSAID = params.get("completeSAID");
+    const completeToken = params.get("token");
+    if (completeSAID && completeToken) {
+      setPendingComplete({ said: completeSAID, token: completeToken });
+      window.history.replaceState({}, "", window.location.pathname);
     }
   }, []);
 
@@ -400,13 +416,13 @@ export default function App() {
     setError(null);
     setGritFitPrompt(null);
     const { name, highSchool, gradYear, email, position, height, weight, speed40, state, gpa } = athlete;
-    if (!name) { setError("Full Name is required."); return; }
+    if (!name)       { setError("Full Name is required."); return; }
     if (!highSchool) { setError("High School is required."); return; }
-    if (!state) { setError("State (HS) is required — used to calculate recruit reach distance."); return; }
-    if (!gradYear) { setError("Expected Grad Year is required."); return; }
-    if (!email) { setError("Student-Athlete Email is required."); return; }
+    if (!state)      { setError("State (HS) is required — used to calculate recruit reach distance."); return; }
+    if (!gradYear)   { setError("Expected Grad Year is required."); return; }
+    if (!email)      { setError("Student-Athlete Email is required."); return; }
     if (!position || !height || !weight || !speed40) { setError("Position, Height, Weight, and 40-Yard Time are required."); return; }
-    if (!gpa) { setError("Cumulative GPA is required."); return; }
+    if (!gpa)        { setError("Cumulative GPA is required."); return; }
 
     setLoading(true);
     try {
@@ -418,13 +434,18 @@ export default function App() {
         agi: athlete.agi ? +athlete.agi : null,
         dependents: athlete.dependents ? (athlete.dependents === "4+" ? 4 : +athlete.dependents) : null,
       };
-      // GPA eligibility check — minimum thresholds by class year
+
+      // GPA eligibility check
       const GPA_MIN = { Senior: 2.5, Junior: 2.4, Soph: 2.3, Freshman: 2.2 };
-      const classLabel = getClassLabel(parsed.gradYear);
-      const requiredGpa = GPA_MIN[classLabel] ?? 2.2;
+      const classLabel   = getClassLabel(parsed.gradYear);
+      const requiredGpa  = GPA_MIN[classLabel] ?? 2.2;
       if (parsed.gpa !== null && parsed.gpa < requiredGpa) {
         setStayGrittyData({ reason: "academic", requiredGpa, classLabel });
-        saveRecruit({ ...parsed, timestamp: new Date().toISOString() }).catch(() => {});
+        if (auth && said) {
+          updateRecruit({ ...parsed, said, timestamp: new Date().toISOString() }).catch(() => {});
+        } else {
+          saveRecruit({ ...parsed, timestamp: new Date().toISOString() }).catch(() => {});
+        }
         return;
       }
 
@@ -432,24 +453,47 @@ export default function App() {
 
       if (!res.topTier || res.top50.length === 0) {
         setStayGrittyData(res);
-        saveRecruit({ ...parsed, timestamp: new Date().toISOString() }).catch(() => {});
+        if (auth && said) {
+          updateRecruit({ ...parsed, said, timestamp: new Date().toISOString() }).catch(() => {});
+        } else {
+          saveRecruit({ ...parsed, timestamp: new Date().toISOString() }).catch(() => {});
+        }
         return;
       }
 
       if (auth) {
-        // Already authenticated — show results immediately, save in background
-        revealResults(res);
-        const identityChanged = savedIdentity &&
-          (athlete.name !== savedIdentity.name || athlete.email !== savedIdentity.email);
-        if (!forceNew && said && !identityChanged) {
-          updateRecruit({ ...parsed, said, timestamp: new Date().toISOString() }).catch(() => {});
+        const isNewPerson = newProfileMode && athlete.email !== auth.email;
+
+        if (isNewPerson) {
+          // New profile for a different person — create new SAID, preserve current session
+          savedResultsRef.current = results;
+          savedAthleteRef.current = { ...athlete };
+          const r = await saveRecruit({ ...parsed, timestamp: new Date().toISOString() });
+          const newSaid = r?.said || null;
+          if (newSaid) {
+            setPendingNewProfile({ res, said: newSaid, email: athlete.email });
+          }
+          setNewProfileMode(false);
         } else {
-          saveRecruit({ ...parsed, timestamp: new Date().toISOString() })
-            .then(r => { if (r?.said) { setSaid(r.said); setSavedIdentity({ name: athlete.name, email: athlete.email }); } })
-            .catch(() => {});
+          // Editing current profile
+          revealResults(res);
+          const emailChanged = athlete.email !== auth.email;
+          if (emailChanged) {
+            // Save with current auth email, then trigger email change verification
+            updateRecruit({ ...parsed, email: auth.email, said, timestamp: new Date().toISOString() }).catch(() => {});
+            requestEmailChange(said, auth.sessionToken, athlete.email).then(r => {
+              if (r.error) { setError(r.error); return; }
+              setEmailVerifyState({ newEmail: athlete.email, code: "", loading: false, error: null, success: false });
+              setShowEmailVerify(true);
+            }).catch(() => setError("Failed to send verification email."));
+          } else {
+            updateRecruit({ ...parsed, said, timestamp: new Date().toISOString() }).catch(() => {});
+          }
+          setSavedIdentity({ name: athlete.name, email: auth.email });
+          setNewProfileMode(false);
         }
       } else {
-        // Gate on auth — save first to get SAID, then show modal
+        // Unauthenticated — save to get SAID, then gate on account creation
         const r = await saveRecruit({ ...parsed, timestamp: new Date().toISOString() });
         const newSaid = r?.said || null;
         if (newSaid) {
@@ -457,6 +501,7 @@ export default function App() {
           setSavedIdentity({ name: athlete.name, email: athlete.email });
         }
         setPendingAuth({ res });
+        setNewProfileMode(false);
       }
     } catch (e) {
       setError(e.message);
@@ -469,13 +514,73 @@ export default function App() {
     setResults(null);
     setAthlete(BLANK_ATHLETE);
     setSavedIdentity(null);
+    setNewProfileMode(true);
     if (!auth) {
-      // Only wipe identity + shortList when not logged in
       setSaid(null);
       setShortList([]);
       localStorage.removeItem("cfb_said");
     }
     setMode("quicklist");
+  }
+
+  function handleEditProfile() {
+    setResults(null);
+    setNewProfileMode(false);
+  }
+
+  function handleNewProfileAuth({ said: newSaid, email: newEmail, sessionToken: newToken, profile: newProfile }) {
+    const capturePending = pendingNewProfile;
+    setPendingNewProfile(null);
+    setShowSwitchModal({
+      res: capturePending?.res,
+      newAuth: { said: newSaid, email: newEmail, sessionToken: newToken, profile: newProfile },
+    });
+    if (savedAthleteRef.current) { setAthlete(savedAthleteRef.current); savedAthleteRef.current = null; }
+    const sr = savedResultsRef.current;
+    savedResultsRef.current = null;
+    setResults(sr !== undefined ? sr : null);
+  }
+
+  function handleSwitchChoice(switchToNew) {
+    const { res, newAuth } = showSwitchModal;
+    setShowSwitchModal(null);
+    if (switchToNew) {
+      if (auth) signOut(auth.said, auth.sessionToken).catch(() => {});
+      localStorage.removeItem("cfb_session_token");
+      setAuth({ said: newAuth.said, email: newAuth.email, sessionToken: newAuth.sessionToken });
+      localStorage.setItem("cfb_session_token", newAuth.sessionToken);
+      setSaid(newAuth.said);
+      setShortList([]);
+      if (newAuth.profile) {
+        const p = newAuth.profile;
+        const restored = {
+          name: p.name || "", highSchool: p.highSchool || "", gradYear: p.gradYear || "",
+          email: p.email || "", phone: p.phone || "", twitter: p.twitter || "",
+          position: p.position || "", height: p.height || "", weight: p.weight || "",
+          speed40: p.speed40 || "", gpa: p.gpa || "", sat: p.sat || "",
+          state: p.state || "", hsLat: p.hsLat || null, hsLng: p.hsLng || null, geoLabel: null,
+          agi: p.agi || "", dependents: p.dependents || "",
+          awards: p.awards || { expectedStarter: false, captain: false, allConference: false, allState: false },
+        };
+        setAthlete(restored);
+        setSavedIdentity({ name: p.name, email: p.email });
+      }
+      if (res) revealResults(res);
+    }
+  }
+
+  async function handleEmailVerifySubmit() {
+    setEmailVerifyState(s => ({ ...s, loading: true, error: null }));
+    try {
+      const r = await confirmEmailChange(said, emailVerifyState.code);
+      if (r.error) { setEmailVerifyState(s => ({ ...s, loading: false, error: r.error })); return; }
+      setAuth(a => a ? { ...a, email: r.email } : a);
+      setSavedIdentity(s => s ? { ...s, email: r.email } : s);
+      setEmailVerifyState(s => ({ ...s, loading: false, success: true }));
+      setTimeout(() => setShowEmailVerify(false), 1500);
+    } catch {
+      setEmailVerifyState(s => ({ ...s, loading: false, error: "Something went wrong. Please try again." }));
+    }
   }
 
   function handleToggleShortList(unitid) {
@@ -661,7 +766,7 @@ export default function App() {
                       >New Profile</button>
                     )}
                     <button
-                      onClick={() => setResults(null)}
+                      onClick={handleEditProfile}
                       style={{ padding: "5px 14px", background: "#2e6b18", border: "1px solid #6ed430", borderRadius: 3, color: "#c8f5a0", fontFamily: "'Barlow Condensed',sans-serif", fontSize: 12, letterSpacing: 1, fontWeight: 700, cursor: "pointer" }}
                     >Edit My Profile</button>
                   </div>
@@ -734,6 +839,76 @@ export default function App() {
         />
       )}
 
+      {pendingNewProfile && (
+        <AuthModal
+          initialView="createAccount"
+          prefillEmail={pendingNewProfile.email}
+          said={pendingNewProfile.said}
+          onAuth={handleNewProfileAuth}
+          onDismiss={() => {
+            setPendingNewProfile(null);
+            if (savedAthleteRef.current) { setAthlete(savedAthleteRef.current); savedAthleteRef.current = null; }
+            const sr = savedResultsRef.current; savedResultsRef.current = null; setResults(sr !== undefined ? sr : null);
+          }}
+          onReturn={() => {
+            setPendingNewProfile(null);
+            if (savedAthleteRef.current) { setAthlete(savedAthleteRef.current); savedAthleteRef.current = null; }
+            const sr = savedResultsRef.current; savedResultsRef.current = null; setResults(sr !== undefined ? sr : null);
+          }}
+        />
+      )}
+      {showSwitchModal && (
+        <div className="auth-overlay">
+          <div className="auth-modal">
+            <div className="auth-logo">Gritty<span style={{ color: "var(--accent)" }}>OS</span></div>
+            <div className="auth-title">Account Created</div>
+            <div className="auth-sub">New account created for <strong>{showSwitchModal.newAuth?.email}</strong>. Would you like to switch to this account now?</div>
+            <button className="auth-submit" onClick={() => handleSwitchChoice(true)}>Switch to {showSwitchModal.newAuth?.email} →</button>
+            <div className="auth-switch" style={{ marginTop: 12 }}>
+              <button onClick={() => handleSwitchChoice(false)}>Stay logged in as {auth?.email}</button>
+            </div>
+            <div className="auth-footer">Support: <a href="mailto:verifygrit@gmail.com">verifygrit@gmail.com</a></div>
+          </div>
+        </div>
+      )}
+      {showEmailVerify && (
+        <div className="auth-overlay">
+          <div className="auth-modal" style={{ position: "relative" }}>
+            <button onClick={() => setShowEmailVerify(false)} style={{ position: "absolute", top: 12, right: 16, background: "none", border: "none", color: "var(--muted)", fontSize: 20, cursor: "pointer", lineHeight: 1 }}>×</button>
+            <div className="auth-logo">Gritty<span style={{ color: "var(--accent)" }}>OS</span></div>
+            <div className="auth-title">Verify New Email</div>
+            <div className="auth-sub">We sent a 6-digit code to <strong>{emailVerifyState.newEmail}</strong>. Enter it below to confirm your new email address.</div>
+            {emailVerifyState.error && <div className="auth-error">{emailVerifyState.error}</div>}
+            {emailVerifyState.success && <div className="auth-success">Email updated successfully!</div>}
+            <div className="auth-field">
+              <label>Verification Code</label>
+              <input type="text" value={emailVerifyState.code}
+                onChange={e => setEmailVerifyState(s => ({ ...s, code: e.target.value }))}
+                placeholder="123456" maxLength={6} autoFocus
+                style={{ letterSpacing: 4, fontSize: 20 }}
+                onKeyDown={e => e.key === "Enter" && handleEmailVerifySubmit()} />
+            </div>
+            <button className="auth-submit" onClick={handleEmailVerifySubmit} disabled={emailVerifyState.loading}>
+              {emailVerifyState.loading ? "Verifying…" : "Confirm New Email →"}
+            </button>
+            <div className="auth-switch">
+              <button onClick={() => requestEmailChange(said, auth.sessionToken, emailVerifyState.newEmail).then(r => { if (!r.error) setEmailVerifyState(s => ({ ...s, error: null })); }).catch(() => {})}>Resend code</button>
+            </div>
+            <div className="auth-footer">Support: <a href="mailto:verifygrit@gmail.com">verifygrit@gmail.com</a></div>
+          </div>
+        </div>
+      )}
+      {pendingComplete && (
+        <AuthModal
+          initialView="createAccount"
+          prefillEmail=""
+          said={pendingComplete.said}
+          onAuth={handleAuthComplete}
+          onDismiss={() => setPendingComplete(null)}
+          onReturn={() => setPendingComplete(null)}
+          pendingToken={pendingComplete.token}
+        />
+      )}
       {showTutorial && (
         <Tutorial
           type={tutorialType}

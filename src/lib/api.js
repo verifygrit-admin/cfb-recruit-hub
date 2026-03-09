@@ -146,3 +146,33 @@ export async function getShortList(said) {
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
 }
+
+export async function completePendingAccount(said, pendingToken, password) {
+  if (!API_BASE) return { error: "No API configured." };
+  const res = await fetch(`${API_BASE}?action=completePendingAccount`, {
+    method: "POST",
+    body: JSON.stringify({ said, pendingToken, password }),
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+export async function requestEmailChange(said, sessionToken, newEmail) {
+  if (!API_BASE) return { error: "No API configured." };
+  const res = await fetch(`${API_BASE}?action=requestEmailChange`, {
+    method: "POST",
+    body: JSON.stringify({ said, sessionToken, newEmail }),
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+export async function confirmEmailChange(said, verifyCode) {
+  if (!API_BASE) return { error: "No API configured." };
+  const res = await fetch(`${API_BASE}?action=confirmEmailChange`, {
+    method: "POST",
+    body: JSON.stringify({ said, verifyCode }),
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}

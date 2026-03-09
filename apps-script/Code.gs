@@ -7,6 +7,7 @@ const GRITTY_DB_SHEET_ID  = "1Pc4LOnD1fhQz-9pI_CUEDaAMDfTkUXcCRTVDfoDWvqo";
 const DB_TAB_NAME         = "GrittyOS DB";   // sheet tab with school data
 const TRACKER_TAB_NAME    = "Tracker";       // optional: recruitment tracker tab
 const RECRUITS_TAB_NAME   = "Recruits";      // where recruit profiles are saved
+const APP_URL             = "https://verifygrit-admin.github.io/cfb-recruit-hub/";
 
 // ── ROUTER ─────────────────────────────────────────────────────────────────────
 function doGet(e) {
@@ -34,6 +35,9 @@ function doPost(e) {
     if (action === "signOut")       return jsonResponse(signOut(body));
     if (action === "forgotPassword")return jsonResponse(forgotPassword(body));
     if (action === "resetPassword") return jsonResponse(resetPassword(body));
+    if (action === "completePendingAccount") return jsonResponse(completePendingAccount(body));
+    if (action === "requestEmailChange")     return jsonResponse(requestEmailChange(body));
+    if (action === "confirmEmailChange")     return jsonResponse(confirmEmailChange(body));
     return jsonResponse({ error: "Unknown action" });
   } catch (err) {
     return jsonResponse({ error: err.message });
@@ -111,11 +115,14 @@ function saveRecruit(profile) {
       "position","height","weight","speed40",
       "gpa","sat","hsLat","hsLng","agi","dependents",
       "expectedStarter","captain","allConference","allState",
+      "status","pendingToken","pendingTokenExpiry",
     ];
     sheet.appendRow(headers);
   }
 
   const said = generateSAID(sheet);
+  const pendingToken = Utilities.getUuid();
+  const pendingExpiry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
   sheet.appendRow([
     said,
@@ -141,9 +148,14 @@ function saveRecruit(profile) {
     profile.awards?.captain         ? "TRUE" : "",
     profile.awards?.allConference   ? "TRUE" : "",
     profile.awards?.allState        ? "TRUE" : "",
+    "pending",
+    pendingToken,
+    pendingExpiry,
   ]);
 
-  return { ok: true, said };
+  try { if (profile.email && profile.name) sendPendingAccountEmail(said, profile.name, profile.email, pendingToken); } catch(e) {}
+
+  return { ok: true, said, pendingToken };
 }
 
 function updateRecruit(profile) {
@@ -183,6 +195,15 @@ function updateRecruit(profile) {
         profile.awards?.allConference   ? "TRUE" : "",
         profile.awards?.allState        ? "TRUE" : "",
       ]]);
+
+      // Mark recruit as active if they have an Auth account
+      const authSheet = getOrCreateAuthSheet();
+      if (findAuthRow(authSheet, 1, said) > 0) {
+        sheet.getRange(row, 24).setValue("active");
+        sheet.getRange(row, 25).setValue("");
+        sheet.getRange(row, 26).setValue("");
+      }
+
       return { ok: true, said, updated: true };
     }
   }
@@ -375,6 +396,7 @@ function createAccount(payload) {
   sheet.appendRow([said, email, passwordHash, salt, sessionToken, tokenExpiry, "", "", now, now, "", 1]);
   logAuth(said, email, "account_created", userAgent);
   updateRecruitAuthFields(said, "login");
+  markRecruitActive(said);
   return { ok: true, sessionToken, tokenExpiry, said, email };
 }
 
@@ -502,6 +524,130 @@ function resetPassword(payload) {
   updateRecruitAuthFields(said, "login");
   const profile = getProfileBySAID(said);
   return { ok: true, sessionToken, tokenExpiry, said, email, profile };
+}
+
+function markRecruitActive(said) {
+  const ss = SpreadsheetApp.openById(GRITTY_DB_SHEET_ID);
+  const sheet = ss.getSheetByName(RECRUITS_TAB_NAME);
+  if (!sheet) return;
+  const lastRow = sheet.getLastRow();
+  for (let row = 2; row <= lastRow; row++) {
+    if (String(sheet.getRange(row, 1).getValue()) === String(said)) {
+      sheet.getRange(row, 24).setValue("active");
+      sheet.getRange(row, 25).setValue("");
+      sheet.getRange(row, 26).setValue("");
+      return;
+    }
+  }
+}
+
+function completePendingAccount(payload) {
+  const { said, pendingToken, password } = payload;
+  if (!said || !pendingToken || !password) return { error: "Missing required fields." };
+  if (String(password).length < 8) return { error: "Password must be at least 8 characters." };
+  const ss = SpreadsheetApp.openById(GRITTY_DB_SHEET_ID);
+  const sheet = ss.getSheetByName(RECRUITS_TAB_NAME);
+  if (!sheet) return { error: "Profile not found." };
+  const lastRow = sheet.getLastRow();
+  let targetRow = -1;
+  for (let row = 2; row <= lastRow; row++) {
+    if (String(sheet.getRange(row, 1).getValue()) === String(said)) { targetRow = row; break; }
+  }
+  if (targetRow < 0) return { error: "Profile not found." };
+  const rowVals = sheet.getRange(targetRow, 1, 1, 26).getValues()[0];
+  const storedToken  = String(rowVals[24] || "");
+  const storedExpiry = rowVals[25];
+  const recruitEmail = String(rowVals[6] || "");
+  if (!storedToken || storedToken !== String(pendingToken)) return { error: "Invalid or expired link." };
+  if (storedExpiry && new Date() > new Date(storedExpiry)) return { error: "This link has expired. Please submit your profile again." };
+  const authSheet = getOrCreateAuthSheet();
+  if (findAuthRow(authSheet, 2, recruitEmail) > 0) return { error: "An account with this email already exists. Sign in instead." };
+  if (findAuthRow(authSheet, 1, said)  > 0) return { error: "An account already exists for this profile." };
+  const salt         = Utilities.getUuid();
+  const passwordHash = hashPassword(salt, String(password));
+  const sessionToken = Utilities.getUuid();
+  const tokenExpiry  = newTokenExpiry();
+  const now          = new Date().toISOString();
+  authSheet.appendRow([said, recruitEmail, passwordHash, salt, sessionToken, tokenExpiry, "", "", now, now, "", 1]);
+  sheet.getRange(targetRow, 24).setValue("active");
+  sheet.getRange(targetRow, 25).setValue("");
+  sheet.getRange(targetRow, 26).setValue("");
+  logAuth(said, recruitEmail, "account_completed_via_link", "");
+  updateRecruitAuthFields(said, "login");
+  const profile = getProfileBySAID(said);
+  return { ok: true, sessionToken, tokenExpiry, said, email: recruitEmail, profile };
+}
+
+function requestEmailChange(payload) {
+  const { said, sessionToken, newEmail } = payload;
+  if (!said || !sessionToken || !newEmail) return { error: "Missing required fields." };
+  const authSheet = getOrCreateAuthSheet();
+  const authRow = findAuthRow(authSheet, 1, said);
+  if (authRow < 0) return { error: "Account not found." };
+  const vals = authSheet.getRange(authRow, 1, 1, 12).getValues()[0];
+  const storedToken  = String(vals[4] || "");
+  const storedExpiry = vals[5];
+  if (storedToken !== String(sessionToken)) return { error: "Invalid session." };
+  if (!storedExpiry || new Date() > new Date(storedExpiry)) return { error: "Session expired." };
+  const existingRow = findAuthRow(authSheet, 2, newEmail);
+  if (existingRow > 0 && existingRow !== authRow) return { error: "This email is already in use by another account." };
+  const verifyCode  = String(Math.floor(100000 + Math.random() * 900000));
+  const codeExpiry  = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+  authSheet.getRange(authRow, 13).setValue(newEmail);
+  authSheet.getRange(authRow, 14).setValue(verifyCode);
+  authSheet.getRange(authRow, 15).setValue(codeExpiry);
+  try {
+    MailApp.sendEmail({
+      to: newEmail,
+      subject: "GrittyOS — Verify your new email address",
+      name: "GrittyOS",
+      body: "You requested to change your GrittyOS account email to this address.\n\nEnter this 6-digit code to confirm:\n\n" + verifyCode + "\n\nThis code expires in 15 minutes.\n\nIf you did not request this change, contact us at verifygrit@gmail.com.\n\nStay Gritty,\nThe GrittyOS Team",
+    });
+  } catch(e) {
+    return { error: "Failed to send verification email. Please contact verifygrit@gmail.com." };
+  }
+  return { ok: true };
+}
+
+function confirmEmailChange(payload) {
+  const { said, verifyCode } = payload;
+  if (!said || !verifyCode) return { error: "Missing required fields." };
+  const authSheet = getOrCreateAuthSheet();
+  const authRow = findAuthRow(authSheet, 1, said);
+  if (authRow < 0) return { error: "Account not found." };
+  const pendingEmail = String(authSheet.getRange(authRow, 13).getValue() || "");
+  const storedCode   = String(authSheet.getRange(authRow, 14).getValue() || "");
+  const expiryStr    = String(authSheet.getRange(authRow, 15).getValue() || "");
+  if (!pendingEmail) return { error: "No pending email change found." };
+  if (storedCode !== String(verifyCode).trim()) return { error: "Invalid verification code." };
+  if (expiryStr && new Date() > new Date(expiryStr)) return { error: "Verification code expired. Please request a new one." };
+  authSheet.getRange(authRow, 2).setValue(pendingEmail);
+  authSheet.getRange(authRow, 13).setValue("");
+  authSheet.getRange(authRow, 14).setValue("");
+  authSheet.getRange(authRow, 15).setValue("");
+  const ss = SpreadsheetApp.openById(GRITTY_DB_SHEET_ID);
+  const recruitSheet = ss.getSheetByName(RECRUITS_TAB_NAME);
+  if (recruitSheet) {
+    const lastRow = recruitSheet.getLastRow();
+    for (let row = 2; row <= lastRow; row++) {
+      if (String(recruitSheet.getRange(row, 1).getValue()) === String(said)) {
+        recruitSheet.getRange(row, 7).setValue(pendingEmail);
+        break;
+      }
+    }
+  }
+  logAuth(said, pendingEmail, "email_changed", "");
+  return { ok: true, email: pendingEmail };
+}
+
+function sendPendingAccountEmail(said, name, email, token) {
+  const link = APP_URL + "?completeSAID=" + encodeURIComponent(said) + "&token=" + encodeURIComponent(token);
+  MailApp.sendEmail({
+    to: email,
+    subject: "GrittyOS — Complete your GRIT Fit account setup",
+    name: "GrittyOS",
+    body: "Hi " + (name || "there") + ",\n\nYour GRIT Fit profile (" + said + ") has been created.\n\nSet your password to access your results and short list:\n\n" + link + "\n\nThis link expires in 7 days. If you did not submit this profile, please ignore this email.\n\nStay Gritty,\nThe GrittyOS Team\nverifygrit@gmail.com",
+  });
 }
 
 // ── HELPERS ────────────────────────────────────────────────────────────────────
