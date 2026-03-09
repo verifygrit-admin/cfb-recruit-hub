@@ -51,6 +51,8 @@ export default function App() {
   const [shortList, setShortList]           = useState([]);     // My Short List schools
   const [auth, setAuth]                     = useState(null);   // { said, email, sessionToken } or null
   const [pendingAuth, setPendingAuth]       = useState(null);   // { res } waiting for auth
+  const [showAuthModal, setShowAuthModal]   = useState(false);  // sign-in-only modal
+  const [authModalView, setAuthModalView]   = useState("signIn");
   const browseAnimShown   = useRef(false);
   const qlAnimShown       = useRef(false);
   const restoreSessionRef = useRef(null);   // profile to re-run after schools load
@@ -158,6 +160,12 @@ export default function App() {
   useEffect(() => {
     window.__shortListIds = shortList.map(s => String(s.UNITID));
     window.__toggleShortList = (unitid) => {
+      if (!auth) {
+        // Gate: prompt sign-in or create account
+        setAuthModalView(said ? "signIn" : "createAccount");
+        setShowAuthModal(true);
+        return;
+      }
       const uid = String(unitid);
       setShortList(sl => {
         if (sl.some(s => String(s.UNITID) === uid)) {
@@ -167,7 +175,6 @@ export default function App() {
           alert("Your Short List is full (max 40 schools). Remove a school to add another.");
           return sl;
         }
-        // Find school from results.scored first, then raw schools list
         const scored  = results?.scored?.find(s => String(s.UNITID) === uid);
         const rawSch  = schools.find(s => String(s.UNITID) === uid);
         const base    = scored || rawSch;
@@ -180,7 +187,7 @@ export default function App() {
         }];
       });
     };
-  }, [shortList, results, schools]);
+  }, [shortList, results, schools, auth, said]);
 
   // Auto-geocode when highSchool + state both have values
   useEffect(() => {
@@ -244,22 +251,67 @@ export default function App() {
     setShowResultsModal(true);
   }
 
-  function handleAuthComplete({ said: authSaid, email: authEmail, sessionToken }) {
+  function handleAuthComplete({ said: authSaid, email: authEmail, sessionToken, profile }) {
     setAuth({ said: authSaid, email: authEmail, sessionToken });
     localStorage.setItem("cfb_session_token", sessionToken);
     setSaid(authSaid);
-    setSavedIdentity(prev => prev ? { ...prev, email: authEmail } : { name: athlete.name, email: authEmail });
-    setPendingAuth(prev => {
-      if (prev?.res) revealResults(prev.res);
-      return null;
-    });
+    setShowAuthModal(false);
+
+    // Restore short list from localStorage
+    try {
+      const sl = localStorage.getItem(`cfb_sl_${authSaid}`);
+      if (sl) setShortList(JSON.parse(sl));
+    } catch {}
+
+    if (pendingAuth?.res) {
+      // Coming from a submit gate — show already-computed results
+      setSavedIdentity(prev => prev ? { ...prev, email: authEmail } : { name: athlete.name, email: authEmail });
+      revealResults(pendingAuth.res);
+      setPendingAuth(null);
+    } else {
+      // Sign-in only — restore GRIT Fit from returned profile if possible
+      setPendingAuth(null);
+      const p = profile;
+      if (p?.name && p?.position && schools.length) {
+        const restored = {
+          name: p.name || "", highSchool: p.highSchool || "",
+          gradYear: p.gradYear || "", email: p.email || "",
+          phone: p.phone || "", twitter: p.twitter || "",
+          position: p.position || "", height: p.height || "",
+          weight: p.weight || "", speed40: p.speed40 || "",
+          gpa: p.gpa || "", sat: p.sat || "",
+          state: p.state || "",
+          hsLat: p.hsLat || null, hsLng: p.hsLng || null, geoLabel: null,
+          agi: p.agi || "", dependents: p.dependents || "",
+          awards: p.awards || { expectedStarter: false, captain: false, allConference: false, allState: false },
+        };
+        setAthlete(restored);
+        setSavedIdentity({ name: p.name, email: p.email });
+        const parsed = {
+          ...restored,
+          height: +restored.height || 0, weight: +restored.weight || 0,
+          speed40: +restored.speed40 || 0,
+          gpa: restored.gpa ? +restored.gpa : null,
+          sat: restored.sat ? +restored.sat : null,
+          agi: restored.agi ? +restored.agi : null,
+          dependents: restored.dependents ? (restored.dependents === "4+" ? 4 : +restored.dependents) : null,
+        };
+        if (parsed.name && parsed.position && parsed.height) {
+          const res = runQuickList(parsed, schools, tracker);
+          if (res.topTier && res.top50.length > 0) revealResults(res);
+        }
+      }
+    }
   }
 
   function handleLogout() {
     if (!auth) return;
     signOut(auth.said, auth.sessionToken).catch(() => {});
     setAuth(null);
+    setResults(null);
+    setShortList([]);
     localStorage.removeItem("cfb_session_token");
+    // Keep cfb_said + cfb_sl_${said} in localStorage for sign-back-in restore
   }
 
   async function handleSubmit(forceNew = false) {
@@ -543,6 +595,8 @@ export default function App() {
                   error={error}
                   geocoding={geocoding}
                   hasSaid={!!said}
+                  auth={auth}
+                  onSignIn={() => { setAuthModalView("signIn"); setShowAuthModal(true); }}
                 />
               </div>
             )
@@ -569,6 +623,15 @@ export default function App() {
           prefillEmail={athlete.email}
           said={said}
           onAuth={handleAuthComplete}
+        />
+      )}
+      {showAuthModal && !pendingAuth && (
+        <AuthModal
+          initialView={authModalView}
+          prefillEmail={athlete.email || ""}
+          said={said}
+          onAuth={handleAuthComplete}
+          onDismiss={() => setShowAuthModal(false)}
         />
       )}
 

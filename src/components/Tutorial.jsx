@@ -3,7 +3,7 @@ import { useState } from "react";
 const BROWSE_SLIDES = [
   {
     num: "01 / 04",
-    title: "Welcome to Browse Schools",
+    title: "Welcome to GrittyOS CFB Recruit Hub",
     body: "This map shows every NCAA football program — 661 schools across all divisions. Markers are color-coded by division tier. Click any marker to see program details, recruiting links, and financial data.",
     extra: (
       <div className="tut-legend">

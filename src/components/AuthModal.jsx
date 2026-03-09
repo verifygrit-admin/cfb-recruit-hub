@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { createAccount, signIn, forgotPassword, resetPassword } from "../lib/api.js";
 
-export default function AuthModal({ initialView = "createAccount", prefillEmail = "", said, onAuth }) {
+export default function AuthModal({ initialView = "createAccount", prefillEmail = "", said, onAuth, onDismiss }) {
   const [view, setView]             = useState(initialView);
   const [email, setEmail]           = useState(prefillEmail);
   const [password, setPassword]     = useState("");
@@ -68,6 +68,13 @@ export default function AuthModal({ initialView = "createAccount", prefillEmail 
   return (
     <div className="auth-overlay">
       <div className="auth-modal">
+        {onDismiss && (
+          <button onClick={onDismiss} style={{
+            position: "absolute", top: 12, right: 16,
+            background: "none", border: "none", color: "var(--muted)",
+            fontSize: 20, cursor: "pointer", lineHeight: 1,
+          }}>×</button>
+        )}
         <div className="auth-logo">Gritty<span>OS</span></div>
 
         {/* ── Create Account ── */}

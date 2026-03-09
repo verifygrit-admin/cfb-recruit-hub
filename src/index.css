@@ -804,6 +804,7 @@ select:focus { outline: none; border-color: var(--accent); }
   padding: 16px;
 }
 .auth-modal {
+  position: relative;
   background: #0b1010; border: 1px solid #2e6b18;
   border-radius: 8px; padding: 36px 32px 28px;
   max-width: 420px; width: 100%;
@@ -875,6 +876,19 @@ select:focus { outline: none; border-color: var(--accent); }
   font-size: 11px; color: var(--muted);
 }
 .auth-footer a { color: var(--muted); }
+
+/* Sign-in restore banner (GRIT Fit form) */
+.signin-restore-banner {
+  background: rgba(46, 107, 24, 0.12); border: 1px solid #2e6b18;
+  border-radius: 4px; padding: 10px 14px; margin-bottom: 16px;
+  font-size: 12px; color: var(--muted);
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+}
+.signin-restore-banner button {
+  background: none; border: none; color: var(--accent);
+  font-size: 12px; font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 700; letter-spacing: 0.5px; cursor: pointer; padding: 0;
+}
 
 /* Sign Out button (desktop header) */
 .signout-btn {
