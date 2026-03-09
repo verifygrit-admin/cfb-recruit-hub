@@ -53,6 +53,13 @@ export async function geocodeHighSchool(name, state) {
   }
 }
 
+export async function checkEmail(email) {
+  if (!API_BASE || !email) return { hasAccount: false };
+  const res = await fetch(`${API_BASE}?action=checkEmail&email=${encodeURIComponent(email)}`);
+  if (!res.ok) return { hasAccount: false };
+  return res.json();
+}
+
 export async function saveRecruit(profile) {
   if (!API_BASE) throw new Error("VITE_API_BASE not set. See README.");
   const res = await fetch(`${API_BASE}?action=saveRecruit`, {
@@ -172,6 +179,26 @@ export async function confirmEmailChange(said, verifyCode) {
   const res = await fetch(`${API_BASE}?action=confirmEmailChange`, {
     method: "POST",
     body: JSON.stringify({ said, verifyCode }),
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+export async function requestEmailChangeMagicLink(said, sessionToken, newEmail) {
+  if (!API_BASE) return { error: "No API configured." };
+  const res = await fetch(`${API_BASE}?action=requestEmailChangeMagicLink`, {
+    method: "POST",
+    body: JSON.stringify({ said, sessionToken, newEmail }),
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+export async function confirmEmailChangeMagicLink(said, token) {
+  if (!API_BASE) return { error: "No API configured." };
+  const res = await fetch(`${API_BASE}?action=confirmEmailChangeMagicLink`, {
+    method: "POST",
+    body: JSON.stringify({ said, token }),
   });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();

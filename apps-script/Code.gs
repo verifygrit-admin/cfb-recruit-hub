@@ -17,6 +17,7 @@ function doGet(e) {
     if (action === "tracker")       return jsonResponse(getTracker());
     if (action === "getShortList")  return jsonResponse(getShortList(e.parameter.said));
     if (action === "validateToken") return jsonResponse(validateToken(e.parameter.said, e.parameter.token));
+    if (action === "checkEmail")    return jsonResponse(checkEmail(e.parameter.email));
     return jsonResponse({ error: "Unknown action" });
   } catch (err) {
     return jsonResponse({ error: err.message });
@@ -35,9 +36,11 @@ function doPost(e) {
     if (action === "signOut")       return jsonResponse(signOut(body));
     if (action === "forgotPassword")return jsonResponse(forgotPassword(body));
     if (action === "resetPassword") return jsonResponse(resetPassword(body));
-    if (action === "completePendingAccount") return jsonResponse(completePendingAccount(body));
-    if (action === "requestEmailChange")     return jsonResponse(requestEmailChange(body));
-    if (action === "confirmEmailChange")     return jsonResponse(confirmEmailChange(body));
+    if (action === "completePendingAccount")       return jsonResponse(completePendingAccount(body));
+    if (action === "requestEmailChange")           return jsonResponse(requestEmailChange(body));
+    if (action === "confirmEmailChange")           return jsonResponse(confirmEmailChange(body));
+    if (action === "requestEmailChangeMagicLink")  return jsonResponse(requestEmailChangeMagicLink(body));
+    if (action === "confirmEmailChangeMagicLink")  return jsonResponse(confirmEmailChangeMagicLink(body));
     return jsonResponse({ error: "Unknown action" });
   } catch (err) {
     return jsonResponse({ error: err.message });
@@ -101,6 +104,13 @@ function generateSAID(sheet) {
 
   // Fallback if last row has no valid SAID
   return "GRIT-" + year + "-0005";
+}
+
+function checkEmail(email) {
+  if (!email) return { hasAccount: false };
+  const sheet = getOrCreateAuthSheet();
+  const row = findAuthRow(sheet, 2, email);
+  return { hasAccount: row > 0 };
 }
 
 function saveRecruit(profile) {
@@ -369,10 +379,10 @@ function getProfileBySAID(said) {
         hsLat: r[15] || null, hsLng: r[16] || null,
         agi: r[17] ? String(r[17]) : "", dependents: r[18] ? String(r[18]) : "",
         awards: {
-          expectedStarter: r[19] === "TRUE",
-          captain:         r[20] === "TRUE",
-          allConference:   r[21] === "TRUE",
-          allState:        r[22] === "TRUE",
+          expectedStarter: !!r[19],
+          captain:         !!r[20],
+          allConference:   !!r[21],
+          allState:        !!r[22],
         },
       };
     }
@@ -604,9 +614,77 @@ function requestEmailChange(payload) {
       body: "You requested to change your GrittyOS account email to this address.\n\nEnter this 6-digit code to confirm:\n\n" + verifyCode + "\n\nThis code expires in 15 minutes.\n\nIf you did not request this change, contact us at verifygrit@gmail.com.\n\nStay Gritty,\nThe GrittyOS Team",
     });
   } catch(e) {
-    return { error: "Failed to send verification email. Please contact verifygrit@gmail.com." };
+    return { error: "Failed to send verification email: " + e.message };
   }
   return { ok: true };
+}
+
+function requestEmailChangeMagicLink(payload) {
+  const { said, sessionToken, newEmail } = payload;
+  if (!said || !sessionToken || !newEmail) return { error: "Missing required fields." };
+  const authSheet = getOrCreateAuthSheet();
+  const authRow = findAuthRow(authSheet, 1, said);
+  if (authRow < 0) return { error: "Account not found." };
+  const vals = authSheet.getRange(authRow, 1, 1, 12).getValues()[0];
+  const storedToken  = String(vals[4] || "");
+  const storedExpiry = vals[5];
+  if (storedToken !== String(sessionToken)) return { error: "Invalid session." };
+  if (!storedExpiry || new Date() > new Date(storedExpiry)) return { error: "Session expired." };
+  const existingRow = findAuthRow(authSheet, 2, newEmail);
+  if (existingRow > 0 && existingRow !== authRow) return { error: "This email is already in use by another account." };
+  const changeToken = Utilities.getUuid();
+  const tokenExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+  authSheet.getRange(authRow, 13).setValue(newEmail);
+  authSheet.getRange(authRow, 14).setValue(changeToken);
+  authSheet.getRange(authRow, 15).setValue(tokenExpiry);
+  const link = APP_URL + "?changeEmail=" + encodeURIComponent(said) + "&token=" + encodeURIComponent(changeToken);
+  try {
+    MailApp.sendEmail({
+      to: newEmail,
+      subject: "GrittyOS — Confirm your new email address",
+      name: "GrittyOS",
+      body:
+        "You requested to change your GrittyOS account email to this address.\n\n" +
+        "Click the link below to confirm:\n\n" + link + "\n\n" +
+        "This link expires in 24 hours.\n\n" +
+        "If you did not request this change, contact us at verifygrit@gmail.com.\n\n" +
+        "Stay Gritty,\nThe GrittyOS Team",
+    });
+  } catch(e) {
+    return { error: "Failed to send confirmation email: " + e.message };
+  }
+  return { ok: true };
+}
+
+function confirmEmailChangeMagicLink(payload) {
+  const { said, token } = payload;
+  if (!said || !token) return { error: "Missing required fields." };
+  const authSheet = getOrCreateAuthSheet();
+  const authRow = findAuthRow(authSheet, 1, said);
+  if (authRow < 0) return { error: "Account not found." };
+  const pendingEmail = String(authSheet.getRange(authRow, 13).getValue() || "");
+  const storedToken  = String(authSheet.getRange(authRow, 14).getValue() || "");
+  const expiryStr    = String(authSheet.getRange(authRow, 15).getValue() || "");
+  if (!pendingEmail) return { error: "No pending email change found." };
+  if (storedToken !== String(token).trim()) return { error: "Invalid or expired link." };
+  if (expiryStr && new Date() > new Date(expiryStr)) return { error: "This link has expired. Please request a new one from Settings." };
+  authSheet.getRange(authRow, 2).setValue(pendingEmail);
+  authSheet.getRange(authRow, 13).setValue("");
+  authSheet.getRange(authRow, 14).setValue("");
+  authSheet.getRange(authRow, 15).setValue("");
+  const ss = SpreadsheetApp.openById(GRITTY_DB_SHEET_ID);
+  const recruitSheet = ss.getSheetByName(RECRUITS_TAB_NAME);
+  if (recruitSheet) {
+    const lastRow = recruitSheet.getLastRow();
+    for (let row = 2; row <= lastRow; row++) {
+      if (String(recruitSheet.getRange(row, 1).getValue()) === String(said)) {
+        recruitSheet.getRange(row, 7).setValue(pendingEmail);
+        break;
+      }
+    }
+  }
+  logAuth(said, pendingEmail, "email_changed_via_link", "");
+  return { ok: true, email: pendingEmail };
 }
 
 function confirmEmailChange(payload) {
