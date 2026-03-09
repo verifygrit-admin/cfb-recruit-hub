@@ -9,7 +9,7 @@ import Tutorial from "./components/Tutorial.jsx";
 import HelmetAnim from "./components/HelmetAnim.jsx";
 import StayGrittyModal from "./components/StayGrittyModal.jsx";
 import AuthModal from "./components/AuthModal.jsx";
-import { fetchSchools, fetchTracker, saveRecruit, updateRecruit, geocodeHighSchool, saveShortList, validateToken, signOut } from "./lib/api.js";
+import { fetchSchools, fetchTracker, saveRecruit, updateRecruit, geocodeHighSchool, saveShortList, getShortList, validateToken, signOut } from "./lib/api.js";
 import { runQuickList, getClassLabel } from "./lib/scoring.js";
 
 const BLANK_ATHLETE = {
@@ -56,7 +56,8 @@ export default function App() {
   const [gritFitPrompt, setGritFitPrompt]   = useState(null);   // contextual redirect message
   const browseAnimShown   = useRef(false);
   const qlAnimShown       = useRef(false);
-  const restoreSessionRef = useRef(null);   // profile to re-run after schools load
+  const restoreSessionRef  = useRef(null);   // profile to re-run after schools load
+  const restoreSlRef       = useRef(null);   // SAID to fetch short list from server after schools load
 
   useEffect(() => {
     fetchSchools()
@@ -78,11 +79,18 @@ export default function App() {
       validateToken(savedSaid, savedToken).then(r => {
         if (r.ok) {
           setAuth({ said: savedSaid, email: r.email, sessionToken: savedToken });
-          // Restore short list only after confirmed auth
+          // Restore short list — localStorage first, server fallback if empty
           try {
             const sl = localStorage.getItem(`cfb_sl_${savedSaid}`);
-            if (sl) setShortList(JSON.parse(sl));
-          } catch {}
+            const parsed = sl ? JSON.parse(sl) : [];
+            if (parsed.length) {
+              setShortList(parsed);
+            } else {
+              restoreSlRef.current = savedSaid; // fetch from server when schools load
+            }
+          } catch {
+            restoreSlRef.current = savedSaid;
+          }
           if (r.profile) {
             const p = r.profile;
             const restored = {
@@ -148,16 +156,48 @@ export default function App() {
     }
   }, [dataLoaded, schools, tracker]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Restore short list from server when localStorage is empty (cross-device or post-overwrite-bug)
+  useEffect(() => {
+    if (!dataLoaded || !schools.length || !restoreSlRef.current) return;
+    const saidToRestore = restoreSlRef.current;
+    restoreSlRef.current = null;
+    getShortList(saidToRestore).then(r => {
+      if (!r.schools?.length) return;
+      const schoolMap = new Map(schools.map(s => [String(s.UNITID), s]));
+      const restored = r.schools.map(item => {
+        const base = schoolMap.get(String(item.unitid));
+        if (!base) return null;
+        return {
+          ...base,
+          matchRank:     item.matchRank  || null,
+          matchTier:     item.matchTier  || null,
+          netCost:       item.netCost   != null ? Number(item.netCost)   : null,
+          droi:          item.droi      != null ? Number(item.droi)      : null,
+          adltv:         item.adltv     != null ? Number(item.adltv)     : base.adltv,
+          dist:          item.dist      != null ? Number(item.dist)      : null,
+          crm_contacted: item.crm_contacted === true || item.crm_contacted === "TRUE",
+          crm_applied:   item.crm_applied   === true || item.crm_applied   === "TRUE",
+          crm_offer:     item.crm_offer     === true || item.crm_offer     === "TRUE",
+          crm_committed: item.crm_committed === true || item.crm_committed === "TRUE",
+        };
+      }).filter(Boolean);
+      if (restored.length) setShortList(restored);
+    }).catch(() => {});
+  }, [dataLoaded, schools]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Persist SAID + short list to localStorage; debounce Sheet sync
+  // Only write when authenticated — prevents logout clearing the saved list
   useEffect(() => {
     if (!said) return;
     localStorage.setItem("cfb_said", said);
-    localStorage.setItem(`cfb_sl_${said}`, JSON.stringify(shortList));
-    const timer = setTimeout(() => {
-      saveShortList(said, shortList).catch(() => {});
-    }, 2000);
-    return () => clearTimeout(timer);
-  }, [shortList, said]);
+    if (auth) {
+      localStorage.setItem(`cfb_sl_${said}`, JSON.stringify(shortList));
+      const timer = setTimeout(() => {
+        saveShortList(said, shortList).catch(() => {});
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [shortList, said, auth]);
 
   // Register window handlers so Leaflet popup buttons can call React state
   useEffect(() => {
@@ -266,11 +306,44 @@ export default function App() {
     setSaid(authSaid);
     setShowAuthModal(false);
 
-    // Restore short list from localStorage
+    // Restore short list — localStorage first, server fallback if empty
     try {
       const sl = localStorage.getItem(`cfb_sl_${authSaid}`);
-      if (sl) setShortList(JSON.parse(sl));
-    } catch {}
+      const parsed = sl ? JSON.parse(sl) : [];
+      if (parsed.length) {
+        setShortList(parsed);
+      } else {
+        restoreSlRef.current = authSaid; // fetch from server when schools load (or immediately if loaded)
+        if (dataLoaded && schools.length) {
+          // Schools already loaded — trigger the effect by setting and immediately clearing via a timeout
+          // (the effect watches restoreSlRef, not state — manually invoke inline instead)
+          getShortList(authSaid).then(r => {
+            if (!r.schools?.length) return;
+            const schoolMap = new Map(schools.map(s => [String(s.UNITID), s]));
+            const restored = r.schools.map(item => {
+              const base = schoolMap.get(String(item.unitid));
+              if (!base) return null;
+              return {
+                ...base,
+                matchRank:     item.matchRank  || null,
+                matchTier:     item.matchTier  || null,
+                netCost:       item.netCost   != null ? Number(item.netCost)   : null,
+                droi:          item.droi      != null ? Number(item.droi)      : null,
+                adltv:         item.adltv     != null ? Number(item.adltv)     : base.adltv,
+                dist:          item.dist      != null ? Number(item.dist)      : null,
+                crm_contacted: item.crm_contacted === true || item.crm_contacted === "TRUE",
+                crm_applied:   item.crm_applied   === true || item.crm_applied   === "TRUE",
+                crm_offer:     item.crm_offer     === true || item.crm_offer     === "TRUE",
+                crm_committed: item.crm_committed === true || item.crm_committed === "TRUE",
+              };
+            }).filter(Boolean);
+            if (restored.length) { restoreSlRef.current = null; setShortList(restored); }
+          }).catch(() => {});
+        }
+      }
+    } catch {
+      restoreSlRef.current = authSaid;
+    }
 
     if (pendingAuth?.res) {
       // Coming from a submit gate — show already-computed results
