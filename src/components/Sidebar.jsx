@@ -54,7 +54,7 @@ export default function Sidebar({ schools, filters, onChange, visibleCount }) {
   }
 
   return (
-    <aside className="sidebar">
+    <aside>
 
       <div className="sidebar-section">
         <div className="sidebar-label">Search</div>
