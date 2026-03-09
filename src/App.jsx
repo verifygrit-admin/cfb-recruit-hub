@@ -9,7 +9,8 @@ import Tutorial from "./components/Tutorial.jsx";
 import HelmetAnim from "./components/HelmetAnim.jsx";
 import StayGrittyModal from "./components/StayGrittyModal.jsx";
 import AuthModal from "./components/AuthModal.jsx";
-import { fetchSchools, fetchTracker, saveRecruit, updateRecruit, geocodeHighSchool, saveShortList, getShortList, validateToken, signOut, completePendingAccount, requestEmailChange, confirmEmailChange } from "./lib/api.js";
+import SettingsPage from "./components/SettingsPage.jsx";
+import { fetchSchools, fetchTracker, saveRecruit, updateRecruit, geocodeHighSchool, saveShortList, getShortList, validateToken, signOut, completePendingAccount, confirmEmailChangeMagicLink, checkEmail } from "./lib/api.js";
 import { runQuickList, getClassLabel } from "./lib/scoring.js";
 
 const BLANK_ATHLETE = {
@@ -56,9 +57,9 @@ export default function App() {
   const [newProfileMode, setNewProfileMode]       = useState(false);
   const [pendingNewProfile, setPendingNewProfile] = useState(null);
   const [showSwitchModal, setShowSwitchModal]     = useState(null);
-  const [showEmailVerify, setShowEmailVerify]     = useState(false);
-  const [emailVerifyState, setEmailVerifyState]   = useState({ newEmail: "", code: "", loading: false, error: null, success: false });
-  const [pendingComplete, setPendingComplete]     = useState(null);
+  const [pendingComplete, setPendingComplete]         = useState(null);
+  const [pendingEmailConfirm, setPendingEmailConfirm] = useState(null);  // { said, token } from ?changeEmail= URL param
+  const [emailConfirmState, setEmailConfirmState]     = useState(null);  // { loading, error, success, email }
   const [gritFitPrompt, setGritFitPrompt]   = useState(null);   // contextual redirect message
   const browseAnimShown   = useRef(false);
   const qlAnimShown       = useRef(false);
@@ -128,12 +129,17 @@ export default function App() {
       browseAnimShown.current = true;
       setShowBrowseAnim(true);
     }
-    // Check for magic link completion (?completeSAID=...&token=...)
+    // Check for magic link params in URL
     const params = new URLSearchParams(window.location.search);
-    const completeSAID = params.get("completeSAID");
+    const completeSAID  = params.get("completeSAID");
     const completeToken = params.get("token");
+    const changeEmailSAID  = params.get("changeEmail");
+    const changeEmailToken = params.get("token");
     if (completeSAID && completeToken) {
       setPendingComplete({ said: completeSAID, token: completeToken });
+      window.history.replaceState({}, "", window.location.pathname);
+    } else if (changeEmailSAID && changeEmailToken) {
+      setPendingEmailConfirm({ said: changeEmailSAID, token: changeEmailToken });
       window.history.replaceState({}, "", window.location.pathname);
     }
   }, []);
@@ -183,14 +189,22 @@ export default function App() {
       const restored = r.schools.map(item => {
         const base = schoolMap.get(String(item.unitid));
         if (!base) return null;
+        const parseMoney = v => v != null && v !== "" ? (typeof v === "number" ? v : parseFloat(String(v).replace(/[$,\s]/g, "")) || 0) : 0;
         return {
           ...base,
-          matchRank:     item.matchRank  || null,
-          matchTier:     item.matchTier  || null,
-          netCost:       item.netCost   != null ? Number(item.netCost)   : null,
-          droi:          item.droi      != null ? Number(item.droi)      : null,
-          adltv:         item.adltv     != null ? Number(item.adltv)     : base.adltv,
-          dist:          item.dist      != null ? Number(item.dist)      : null,
+          _schoolName:   item.schoolName  || base["School Name"]          || "Unknown",
+          _divLabel:     item.div         || base["NCAA Division"]         || "",
+          _coaNum:       item.coa != null  ? Number(item.coa)              : parseMoney(base["COA (Out-of-State)"] || base.COA),
+          _qLink:        item.qLink       || base["Recruiting Q Link"]     || base.q_link   || "",
+          _coachLink:    item.coachLink   || base["Coach Page"]            || base.coach_link || "",
+          matchRank:     item.matchRank   || null,
+          matchTier:     item.matchTier   || null,
+          netCost:       item.netCost    != null ? Number(item.netCost)    : null,
+          droi:          item.droi       != null ? Number(item.droi)       : null,
+          breakEven:     item.breakEven  != null ? Number(item.breakEven)  : null,
+          adltv:         item.adltv      != null ? Number(item.adltv)      : parseMoney(base.adltv),
+          dist:          item.dist       != null ? Number(item.dist)       : null,
+          addedAt:       item.addedAt    || new Date().toISOString(),
           crm_contacted: item.crm_contacted === true || item.crm_contacted === "TRUE",
           crm_applied:   item.crm_applied   === true || item.crm_applied   === "TRUE",
           crm_offer:     item.crm_offer     === true || item.crm_offer     === "TRUE",
@@ -253,6 +267,50 @@ export default function App() {
       });
     };
   }, [shortList, results, schools, auth, said]);
+
+  // Auto-confirm email change from magic link URL param
+  useEffect(() => {
+    if (!pendingEmailConfirm) return;
+    const { said: pSaid, token: pToken } = pendingEmailConfirm;
+    setEmailConfirmState({ loading: true, error: null, success: false, email: null });
+    confirmEmailChangeMagicLink(pSaid, pToken).then(r => {
+      if (r.error) {
+        setEmailConfirmState({ loading: false, error: r.error, success: false, email: null });
+      } else {
+        setEmailConfirmState({ loading: false, error: null, success: true, email: r.email });
+        // Update auth + savedIdentity if this matches the current session
+        setAuth(a => a && a.said === pSaid ? { ...a, email: r.email } : a);
+        setSavedIdentity(s => s ? { ...s, email: r.email } : s);
+      }
+      setPendingEmailConfirm(null);
+    }).catch(() => {
+      setEmailConfirmState({ loading: false, error: "Something went wrong. Please try again.", success: false, email: null });
+      setPendingEmailConfirm(null);
+    });
+  }, [pendingEmailConfirm]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Resolve missing derived fields (_schoolName, _divLabel, etc.) from DB when schools load.
+  // Handles localStorage restores and server restores of pre-fix short list data.
+  useEffect(() => {
+    if (!dataLoaded || !schools.length || !shortList.length) return;
+    const needsResolve = shortList.some(s => !s._schoolName);
+    if (!needsResolve) return;
+    const schoolMap = new Map(schools.map(s => [String(s.UNITID), s]));
+    const parseMoney = v => v != null && v !== "" ? (typeof v === "number" ? v : parseFloat(String(v).replace(/[$,\s]/g, "")) || 0) : 0;
+    setShortList(sl => sl.map(s => {
+      if (s._schoolName) return s;
+      const base = schoolMap.get(String(s.UNITID));
+      if (!base) return s;
+      return {
+        ...s,
+        _schoolName: base["School Name"]      || "Unknown",
+        _divLabel:   base["NCAA Division"]     || "",
+        _coaNum:     parseMoney(base["COA (Out-of-State)"] || base.COA),
+        _qLink:      base["Recruiting Q Link"] || base.q_link    || "",
+        _coachLink:  base["Coach Page"]        || base.coach_link || "",
+      };
+    }));
+  }, [dataLoaded, schools, shortList.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-geocode when highSchool + state both have values
   useEffect(() => {
@@ -367,10 +425,10 @@ export default function App() {
       revealResults(pendingAuth.res);
       setPendingAuth(null);
     } else {
-      // Sign-in only — restore GRIT Fit from returned profile if possible
+      // Sign-in only — restore athlete state immediately from profile, run scoring when schools ready
       setPendingAuth(null);
       const p = profile;
-      if (p?.name && p?.position && schools.length) {
+      if (p?.name) {
         const restored = {
           name: p.name || "", highSchool: p.highSchool || "",
           gradYear: p.gradYear || "", email: p.email || "",
@@ -383,20 +441,27 @@ export default function App() {
           agi: p.agi || "", dependents: p.dependents || "",
           awards: p.awards || { expectedStarter: false, captain: false, allConference: false, allState: false },
         };
+        // Always restore form fields — Settings and GRIT Fit form will be pre-filled
         setAthlete(restored);
         setSavedIdentity({ name: p.name, email: p.email });
-        const parsed = {
-          ...restored,
-          height: +restored.height || 0, weight: +restored.weight || 0,
-          speed40: +restored.speed40 || 0,
-          gpa: restored.gpa ? +restored.gpa : null,
-          sat: restored.sat ? +restored.sat : null,
-          agi: restored.agi ? +restored.agi : null,
-          dependents: restored.dependents ? (restored.dependents === "4+" ? 4 : +restored.dependents) : null,
-        };
-        if (parsed.name && parsed.position && parsed.height) {
-          const res = runQuickList(parsed, schools, tracker);
-          if (res.topTier && res.top50.length > 0) revealResults(res);
+        if (p.position && p.height) {
+          if (schools.length) {
+            // Schools already loaded — run scoring now
+            const parsed = {
+              ...restored,
+              height: +restored.height || 0, weight: +restored.weight || 0,
+              speed40: +restored.speed40 || 0,
+              gpa: restored.gpa ? +restored.gpa : null,
+              sat: restored.sat ? +restored.sat : null,
+              agi: restored.agi ? +restored.agi : null,
+              dependents: restored.dependents ? (restored.dependents === "4+" ? 4 : +restored.dependents) : null,
+            };
+            const res = runQuickList(parsed, schools, tracker);
+            if (res.topTier && res.top50.length > 0) revealResults(res);
+          } else {
+            // Schools still loading — save profile to ref, scoring runs when they arrive
+            restoreSessionRef.current = p;
+          }
         }
       }
     }
@@ -408,8 +473,13 @@ export default function App() {
     setAuth(null);
     setResults(null);
     setShortList([]);
+    setAthlete(BLANK_ATHLETE);
+    setSavedIdentity(null);
+    setSaid(null);
+    setMode("browse");
+    setPanel("map");
     localStorage.removeItem("cfb_session_token");
-    // Keep cfb_said + cfb_sl_${said} in localStorage for sign-back-in restore
+    localStorage.removeItem("cfb_said");
   }
 
   async function handleSubmit(forceNew = false) {
@@ -475,25 +545,22 @@ export default function App() {
           }
           setNewProfileMode(false);
         } else {
-          // Editing current profile
+          // Editing current profile — always use auth.email; email changes handled in Settings
           revealResults(res);
-          const emailChanged = athlete.email !== auth.email;
-          if (emailChanged) {
-            // Save with current auth email, then trigger email change verification
-            updateRecruit({ ...parsed, email: auth.email, said, timestamp: new Date().toISOString() }).catch(() => {});
-            requestEmailChange(said, auth.sessionToken, athlete.email).then(r => {
-              if (r.error) { setError(r.error); return; }
-              setEmailVerifyState({ newEmail: athlete.email, code: "", loading: false, error: null, success: false });
-              setShowEmailVerify(true);
-            }).catch(() => setError("Failed to send verification email."));
-          } else {
-            updateRecruit({ ...parsed, said, timestamp: new Date().toISOString() }).catch(() => {});
-          }
+          updateRecruit({ ...parsed, email: auth.email, said, timestamp: new Date().toISOString() }).catch(() => {});
           setSavedIdentity({ name: athlete.name, email: auth.email });
           setNewProfileMode(false);
         }
       } else {
-        // Unauthenticated — save to get SAID, then gate on account creation
+        // Unauthenticated — check if email already has an account before creating a new SAID
+        const emailCheck = await checkEmail(athlete.email).catch(() => ({ hasAccount: false }));
+        if (emailCheck.hasAccount) {
+          setGritFitPrompt(`An account already exists for ${athlete.email}. Sign in to update your profile and view your results.`);
+          setAuthModalView("signIn");
+          setShowAuthModal(true);
+          return;
+        }
+        // No account — proceed with new SAID creation
         const r = await saveRecruit({ ...parsed, timestamp: new Date().toISOString() });
         const newSaid = r?.said || null;
         if (newSaid) {
@@ -521,11 +588,6 @@ export default function App() {
       localStorage.removeItem("cfb_said");
     }
     setMode("quicklist");
-  }
-
-  function handleEditProfile() {
-    setResults(null);
-    setNewProfileMode(false);
   }
 
   function handleNewProfileAuth({ said: newSaid, email: newEmail, sessionToken: newToken, profile: newProfile }) {
@@ -566,20 +628,6 @@ export default function App() {
         setSavedIdentity({ name: p.name, email: p.email });
       }
       if (res) revealResults(res);
-    }
-  }
-
-  async function handleEmailVerifySubmit() {
-    setEmailVerifyState(s => ({ ...s, loading: true, error: null }));
-    try {
-      const r = await confirmEmailChange(said, emailVerifyState.code);
-      if (r.error) { setEmailVerifyState(s => ({ ...s, loading: false, error: r.error })); return; }
-      setAuth(a => a ? { ...a, email: r.email } : a);
-      setSavedIdentity(s => s ? { ...s, email: r.email } : s);
-      setEmailVerifyState(s => ({ ...s, loading: false, success: true }));
-      setTimeout(() => setShowEmailVerify(false), 1500);
-    } catch {
-      setEmailVerifyState(s => ({ ...s, loading: false, error: "Something went wrong. Please try again." }));
     }
   }
 
@@ -644,8 +692,9 @@ export default function App() {
             mode={mode}
             auth={auth}
             onChange={m => {
-              if (m === "__logout") { handleLogout(); return; }
-              if (m === "__signin") { setAuthModalView("signIn"); setShowAuthModal(true); return; }
+              if (m === "__logout")   { handleLogout(); return; }
+              if (m === "__signin")   { setAuthModalView("signIn"); setShowAuthModal(true); return; }
+              if (m === "__settings") { setMode("settings"); return; }
               setMode(m);
               if (m === "browse") setPanel("map");
             }}
@@ -680,7 +729,17 @@ export default function App() {
 
         {/* Main content */}
         <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-          {isShortList ? (
+          {mode === "settings" ? (
+            <div style={{ flex: 1, overflowY: "auto" }}>
+              <SettingsPage
+                auth={auth}
+                athlete={athlete}
+                onChange={handleChange}
+                onAwardChange={handleAwardChange}
+                onBack={() => setMode(results ? "quicklist" : "quicklist")}
+              />
+            </div>
+          ) : isShortList ? (
             <div style={{ flex: 1, overflowY: "auto" }}>
               <ShortList
                 shortList={shortList}
@@ -766,9 +825,9 @@ export default function App() {
                       >New Profile</button>
                     )}
                     <button
-                      onClick={handleEditProfile}
+                      onClick={() => setMode("settings")}
                       style={{ padding: "5px 14px", background: "#2e6b18", border: "1px solid #6ed430", borderRadius: 3, color: "#c8f5a0", fontFamily: "'Barlow Condensed',sans-serif", fontSize: 12, letterSpacing: 1, fontWeight: 700, cursor: "pointer" }}
-                    >Edit My Profile</button>
+                    >Update My Profile</button>
                   </div>
                 </div>
               </div>
@@ -871,29 +930,31 @@ export default function App() {
           </div>
         </div>
       )}
-      {showEmailVerify && (
+      {emailConfirmState && (
         <div className="auth-overlay">
           <div className="auth-modal" style={{ position: "relative" }}>
-            <button onClick={() => setShowEmailVerify(false)} style={{ position: "absolute", top: 12, right: 16, background: "none", border: "none", color: "var(--muted)", fontSize: 20, cursor: "pointer", lineHeight: 1 }}>×</button>
             <div className="auth-logo">Gritty<span style={{ color: "var(--accent)" }}>OS</span></div>
-            <div className="auth-title">Verify New Email</div>
-            <div className="auth-sub">We sent a 6-digit code to <strong>{emailVerifyState.newEmail}</strong>. Enter it below to confirm your new email address.</div>
-            {emailVerifyState.error && <div className="auth-error">{emailVerifyState.error}</div>}
-            {emailVerifyState.success && <div className="auth-success">Email updated successfully!</div>}
-            <div className="auth-field">
-              <label>Verification Code</label>
-              <input type="text" value={emailVerifyState.code}
-                onChange={e => setEmailVerifyState(s => ({ ...s, code: e.target.value }))}
-                placeholder="123456" maxLength={6} autoFocus
-                style={{ letterSpacing: 4, fontSize: 20 }}
-                onKeyDown={e => e.key === "Enter" && handleEmailVerifySubmit()} />
-            </div>
-            <button className="auth-submit" onClick={handleEmailVerifySubmit} disabled={emailVerifyState.loading}>
-              {emailVerifyState.loading ? "Verifying…" : "Confirm New Email →"}
-            </button>
-            <div className="auth-switch">
-              <button onClick={() => requestEmailChange(said, auth.sessionToken, emailVerifyState.newEmail).then(r => { if (!r.error) setEmailVerifyState(s => ({ ...s, error: null })); }).catch(() => {})}>Resend code</button>
-            </div>
+            {emailConfirmState.loading && (
+              <>
+                <div className="auth-title">Confirming Email…</div>
+                <div className="auth-sub">Please wait.</div>
+              </>
+            )}
+            {emailConfirmState.success && (
+              <>
+                <div className="auth-title">Email Updated!</div>
+                <div className="auth-sub">Your account email has been changed to <strong>{emailConfirmState.email}</strong>.</div>
+                <button className="auth-submit" onClick={() => setEmailConfirmState(null)}>Continue →</button>
+              </>
+            )}
+            {emailConfirmState.error && (
+              <>
+                <div className="auth-title">Link Error</div>
+                <div className="auth-error">{emailConfirmState.error}</div>
+                <div className="auth-sub" style={{ marginTop: 8 }}>Go to Settings to request a new email change link.</div>
+                <button className="auth-submit" onClick={() => { setEmailConfirmState(null); setMode("settings"); }}>Go to Settings →</button>
+              </>
+            )}
             <div className="auth-footer">Support: <a href="mailto:verifygrit@gmail.com">verifygrit@gmail.com</a></div>
           </div>
         </div>

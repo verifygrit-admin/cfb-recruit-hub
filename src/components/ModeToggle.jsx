@@ -52,6 +52,9 @@ export default function ModeToggle({ mode, onChange, auth }) {
             </button>
           ))}
           <div className="nav-dropdown-divider" />
+          {auth && (
+            <button className="nav-dropdown-item" onClick={() => select("__settings")}>Settings</button>
+          )}
           {auth
             ? <button className="nav-dropdown-item nav-dropdown-item--signout" onClick={() => select("__logout")}>Sign Out</button>
             : <button className="nav-dropdown-item nav-dropdown-item--signin" onClick={() => select("__signin")}>Sign In</button>
