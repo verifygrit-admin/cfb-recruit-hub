@@ -53,6 +53,7 @@ export default function App() {
   const [pendingAuth, setPendingAuth]       = useState(null);   // { res } waiting for auth
   const [showAuthModal, setShowAuthModal]   = useState(false);  // sign-in-only modal
   const [authModalView, setAuthModalView]   = useState("signIn");
+  const [gritFitPrompt, setGritFitPrompt]   = useState(null);   // contextual redirect message
   const browseAnimShown   = useRef(false);
   const qlAnimShown       = useRef(false);
   const restoreSessionRef = useRef(null);   // profile to re-run after schools load
@@ -161,9 +162,15 @@ export default function App() {
     window.__shortListIds = shortList.map(s => String(s.UNITID));
     window.__toggleShortList = (unitid) => {
       if (!auth) {
-        // Gate: prompt sign-in or create account
-        setAuthModalView(said ? "signIn" : "createAccount");
-        setShowAuthModal(true);
+        if (!said) {
+          // New user — redirect to My GRIT Fit to build profile first
+          setMode("quicklist");
+          setGritFitPrompt("Complete your Student-Athlete Profile to save schools to your Short List and generate your personalized GRIT Fit results.");
+        } else {
+          // Returning user with profile — prompt sign in
+          setAuthModalView("signIn");
+          setShowAuthModal(true);
+        }
         return;
       }
       const uid = String(unitid);
@@ -316,6 +323,7 @@ export default function App() {
 
   async function handleSubmit(forceNew = false) {
     setError(null);
+    setGritFitPrompt(null);
     const { name, highSchool, gradYear, email, position, height, weight, speed40, state, gpa } = athlete;
     if (!name) { setError("Full Name is required."); return; }
     if (!highSchool) { setError("High School is required."); return; }
@@ -597,6 +605,7 @@ export default function App() {
                   hasSaid={!!said}
                   auth={auth}
                   onSignIn={() => { setAuthModalView("signIn"); setShowAuthModal(true); }}
+                  prompt={gritFitPrompt}
                 />
               </div>
             )

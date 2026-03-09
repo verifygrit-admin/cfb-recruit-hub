@@ -877,6 +877,16 @@ select:focus { outline: none; border-color: var(--accent); }
 }
 .auth-footer a { color: var(--muted); }
 
+/* GRIT Fit redirect prompt (from Browse Schools short list gate) */
+.gritfit-prompt-banner {
+  background: rgba(46, 107, 24, 0.18); border: 1px solid var(--accent);
+  border-radius: 4px; padding: 12px 16px; margin-bottom: 16px;
+  font-size: 13px; color: #c8f5a0; line-height: 1.5;
+  display: flex; align-items: flex-start; gap: 10px;
+  font-family: 'Barlow', sans-serif;
+}
+.gritfit-prompt-icon { font-size: 18px; flex-shrink: 0; margin-top: 1px; }
+
 /* Sign-in restore banner (GRIT Fit form) */
 .signin-restore-banner {
   background: rgba(46, 107, 24, 0.12); border: 1px solid #2e6b18;

@@ -37,7 +37,7 @@ const AWARD_OPTIONS = [
   { key: "allState",        label: "All-State" },
 ];
 
-export default function QuickListForm({ athlete, onChange, onAwardChange, onSubmit, onNewProfile, loading, error, geocoding, hasSaid, auth, onSignIn }) {
+export default function QuickListForm({ athlete, onChange, onAwardChange, onSubmit, onNewProfile, loading, error, geocoding, hasSaid, auth, onSignIn, prompt }) {
   const set = (key, val) => onChange(key, val);
   const [activeInfo, setActiveInfo] = useState(null);
 
@@ -45,6 +45,13 @@ export default function QuickListForm({ athlete, onChange, onAwardChange, onSubm
     <div className="form-wrapper">
       <h2 className="form-title">Student-Athlete Profile</h2>
       <p className="form-subtitle">Enter your data to generate a personalized map of matching NCAA programs. Distance is estimated from your high school — enter your full high school name to ensure the most accurate recruiting reach results.</p>
+
+      {prompt && (
+        <div className="gritfit-prompt-banner">
+          <div className="gritfit-prompt-icon">🏈</div>
+          <div>{prompt}</div>
+        </div>
+      )}
 
       {!auth && hasSaid && (
         <div className="signin-restore-banner">
