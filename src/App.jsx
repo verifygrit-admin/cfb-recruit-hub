@@ -12,6 +12,7 @@ import AuthModal from "./components/AuthModal.jsx";
 import SettingsPage from "./components/SettingsPage.jsx";
 import { fetchSchools, fetchTracker, saveRecruit, updateRecruit, geocodeHighSchool, saveShortList, getShortList, validateToken, signOut, completePendingAccount, confirmEmailChangeMagicLink, checkEmail } from "./lib/api.js";
 import { runQuickList, getClassLabel } from "./lib/scoring.js";
+import grittyOsLogo from "./assets/grittyos-logo.png";
 
 const BLANK_ATHLETE = {
   name: "", highSchool: "", gradYear: "", email: "", phone: "", twitter: "",
@@ -684,7 +685,7 @@ export default function App() {
           onClick={() => { setMode("browse"); setPanel("map"); }}
           aria-label="GrittyOS — Go to Home"
         >
-          <img src="/grittyos-logo.png" alt="GrittyOS" className="logo-img" />
+          <img src={grittyOsLogo} alt="GrittyOS" className="logo-img" />
         </button>
         <div className="header-divider" />
         <div className="header-title">CFB Recruit Hub</div>
