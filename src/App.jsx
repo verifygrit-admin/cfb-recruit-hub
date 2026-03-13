@@ -751,6 +751,7 @@ export default function App() {
                 onChange={handleChange}
                 onAwardChange={handleAwardChange}
                 onBack={() => setMode(results ? "quicklist" : "quicklist")}
+                onSubmit={handleSubmit}
               />
             </div>
           ) : isShortList ? (

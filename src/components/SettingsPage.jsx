@@ -35,7 +35,7 @@ const AWARD_OPTIONS = [
   { key: "allState",        label: "All-State" },
 ];
 
-export default function SettingsPage({ auth, athlete, onChange, onAwardChange, onBack }) {
+export default function SettingsPage({ auth, athlete, onChange, onAwardChange, onBack, onSubmit }) {
   const [saving, setSaving]           = useState(false);
   const [saveError, setSaveError]     = useState(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
@@ -210,7 +210,7 @@ export default function SettingsPage({ auth, athlete, onChange, onAwardChange, o
       <div style={{ marginBottom: 8 }}>
         <div className="form-section-head" style={{ marginBottom: 4 }}>Profile</div>
         <p style={{ fontSize: 12, color: "var(--muted)", margin: "0 0 16px", fontFamily: "'Barlow', sans-serif", lineHeight: 1.5 }}>
-          Update your athletic and academic data below, then click <strong style={{ color: "#c8f5a0" }}>Save Profile</strong>. Navigate to <strong style={{ color: "#c8f5a0" }}>My GRIT Fit</strong> to re-run your results with updated data.
+          Update your athletic and academic data below, then click <strong style={{ color: "#c8f5a0" }}>Save &amp; Re-Run GRIT Fit</strong> to save and instantly update your results.
         </p>
       </div>
 
@@ -250,8 +250,8 @@ export default function SettingsPage({ auth, athlete, onChange, onAwardChange, o
         </div>
       )}
 
-      <button className="form-submit" onClick={handleSaveProfile} disabled={saving}>
-        {saving ? "Saving…" : "Save Profile →"}
+      <button className="form-submit" onClick={onSubmit || handleSaveProfile} disabled={saving}>
+        {saving ? "Saving…" : "Save & Re-Run GRIT Fit →"}
       </button>
     </div>
     </div>
