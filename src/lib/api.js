@@ -2,11 +2,15 @@
 // Set this after deploying the Apps Script (see /apps-script/Code.gs)
 export const API_BASE = import.meta.env.VITE_API_BASE || "";
 
-// Apps Script Web App URLs issue an HTTP redirect. Some mobile browsers convert
-// POST → GET on redirect, causing the URL ?action= param to be lost. Including
-// action in the POST body ensures it survives as a fallback (doPost reads both).
+// Apps Script Web App URLs issue an HTTP redirect. Browsers convert POST → GET
+// on redirect, dropping the body. We put all primitive params in the URL so
+// doGet can handle the request if the redirect strips the POST body.
 function post(action, body = {}) {
-  return fetch(`${API_BASE}?action=${action}`, {
+  const params = new URLSearchParams({ action });
+  Object.entries(body).forEach(([k, v]) => {
+    if (v !== null && v !== undefined && typeof v !== "object") params.append(k, v);
+  });
+  return fetch(`${API_BASE}?${params}`, {
     method: "POST",
     body: JSON.stringify({ action, ...body }),
   });

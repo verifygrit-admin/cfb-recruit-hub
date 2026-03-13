@@ -18,6 +18,15 @@ function doGet(e) {
     if (action === "getShortList")  return jsonResponse(getShortList(e.parameter.said));
     if (action === "validateToken") return jsonResponse(validateToken(e.parameter.said, e.parameter.token));
     if (action === "checkEmail")    return jsonResponse(checkEmail(e.parameter.email));
+    // Fallback: POST actions that arrive as GET due to redirect conversion
+    if (action === "signIn")         return jsonResponse(signIn(e.parameter));
+    if (action === "createAccount")  return jsonResponse(createAccount(e.parameter));
+    if (action === "signOut")        return jsonResponse(signOut(e.parameter));
+    if (action === "forgotPassword") return jsonResponse(forgotPassword(e.parameter));
+    if (action === "resetPassword")  return jsonResponse(resetPassword(e.parameter));
+    if (action === "completePendingAccount") return jsonResponse(completePendingAccount(e.parameter));
+    if (action === "resendSetupEmail")       return jsonResponse(resendSetupEmail(e.parameter));
+    if (action === "saveShortList")          return jsonResponse(saveShortList(e.parameter));
     return jsonResponse({ error: "Unknown action" });
   } catch (err) {
     return jsonResponse({ error: err.message });
