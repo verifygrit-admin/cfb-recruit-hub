@@ -136,7 +136,8 @@ export default function App() {
     const changeEmailSAID  = params.get("changeEmail");
     const changeEmailToken = params.get("token");
     if (completeSAID && completeToken) {
-      setPendingComplete({ said: completeSAID, token: completeToken });
+      const completeEmail = params.get("email") || "";
+      setPendingComplete({ said: completeSAID, token: completeToken, email: completeEmail });
       window.history.replaceState({}, "", window.location.pathname);
     } else if (changeEmailSAID && changeEmailToken) {
       setPendingEmailConfirm({ said: changeEmailSAID, token: changeEmailToken });
@@ -567,6 +568,9 @@ export default function App() {
           setSaid(newSaid);
           setSavedIdentity({ name: athlete.name, email: athlete.email });
         }
+        if (r?.emailError) {
+          setError(`Profile saved but setup email failed to send: ${r.emailError}. Contact verifygrit@gmail.com.`);
+        }
         setPendingAuth({ res });
         setNewProfileMode(false);
       }
@@ -675,7 +679,13 @@ export default function App() {
             <span /><span /><span />
           </button>
         )}
-        <div className="logo">Gritty<span>OS</span></div>
+        <button
+          className="logo-btn"
+          onClick={() => { setMode("browse"); setPanel("map"); }}
+          aria-label="GrittyOS — Go to Home"
+        >
+          <img src="/grittyos-logo.png" alt="GrittyOS" className="logo-img" />
+        </button>
         <div className="header-divider" />
         <div className="header-title">CFB Recruit Hub</div>
         <div className="header-right">
@@ -872,6 +882,7 @@ export default function App() {
           prefillEmail={athlete.email}
           said={said}
           onAuth={handleAuthComplete}
+          onDismiss={() => { setPendingAuth(null); setMode("browse"); }}
           onReturn={() => { setPendingAuth(null); setMode("browse"); }}
         />
       )}
@@ -962,9 +973,9 @@ export default function App() {
       {pendingComplete && (
         <AuthModal
           initialView="createAccount"
-          prefillEmail=""
+          prefillEmail={pendingComplete.email || ""}
           said={pendingComplete.said}
-          onAuth={handleAuthComplete}
+          onAuth={(r) => { setPendingComplete(null); handleAuthComplete(r); }}
           onDismiss={() => setPendingComplete(null)}
           onReturn={() => setPendingComplete(null)}
           pendingToken={pendingComplete.token}
