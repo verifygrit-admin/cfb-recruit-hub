@@ -41,6 +41,7 @@ function doPost(e) {
     if (action === "confirmEmailChange")           return jsonResponse(confirmEmailChange(body));
     if (action === "requestEmailChangeMagicLink")  return jsonResponse(requestEmailChangeMagicLink(body));
     if (action === "confirmEmailChangeMagicLink")  return jsonResponse(confirmEmailChangeMagicLink(body));
+    if (action === "resendSetupEmail")             return jsonResponse(resendSetupEmail(body));
     return jsonResponse({ error: "Unknown action" });
   } catch (err) {
     return jsonResponse({ error: err.message });
@@ -163,9 +164,10 @@ function saveRecruit(profile) {
     pendingExpiry,
   ]);
 
-  try { if (profile.email && profile.name) sendPendingAccountEmail(said, profile.name, profile.email, pendingToken); } catch(e) {}
+  let emailError = null;
+  try { if (profile.email && profile.name) sendPendingAccountEmail(said, profile.name, profile.email, pendingToken); } catch(e) { emailError = e.message; }
 
-  return { ok: true, said, pendingToken };
+  return { ok: true, said, pendingToken, emailError };
 }
 
 function updateRecruit(profile) {
@@ -415,7 +417,19 @@ function signIn(payload) {
   if (!email || !password) return { error: "Email and password are required." };
   const sheet = getOrCreateAuthSheet();
   const row   = findAuthRow(sheet, 2, email);
-  if (row < 0) return { error: "No account found for this email." };
+  if (row < 0) {
+    // Check for a pending (unactivated) profile in Recruits tab
+    const recruitSheet = SpreadsheetApp.openById(GRITTY_DB_SHEET_ID).getSheetByName(RECRUITS_TAB_NAME);
+    if (recruitSheet && recruitSheet.getLastRow() > 1) {
+      const rData = recruitSheet.getRange(2, 1, recruitSheet.getLastRow() - 1, 24).getValues();
+      for (const r of rData) {
+        if (String(r[6]).trim().toLowerCase() === email.toLowerCase() && String(r[23]).trim() === "pending") {
+          return { error: "Your account setup is incomplete. Check your email for the setup link, or request a new one.", pendingAccount: true };
+        }
+      }
+    }
+    return { error: "No account found for this email." };
+  }
   const vals        = sheet.getRange(row, 1, 1, 12).getValues()[0];
   const storedSAID  = String(vals[0]);
   const storedHash  = String(vals[2]);
@@ -588,6 +602,34 @@ function completePendingAccount(payload) {
   return { ok: true, sessionToken, tokenExpiry, said, email: recruitEmail, profile };
 }
 
+function resendSetupEmail(payload) {
+  const { email } = payload;
+  if (!email) return { error: "Email is required." };
+  const ss    = SpreadsheetApp.openById(GRITTY_DB_SHEET_ID);
+  const sheet = ss.getSheetByName(RECRUITS_TAB_NAME);
+  if (!sheet || sheet.getLastRow() <= 1) return { error: "No pending profile found for this email." };
+  const rData = sheet.getRange(2, 1, sheet.getLastRow() - 1, 24).getValues();
+  for (let i = 0; i < rData.length; i++) {
+    const rowEmail  = String(rData[i][6] || "").trim().toLowerCase();
+    const rowStatus = String(rData[i][23] || "").trim();
+    if (rowEmail === email.toLowerCase() && rowStatus === "pending") {
+      const said      = String(rData[i][0]);
+      const name      = String(rData[i][2] || "");
+      const newToken  = Utilities.getUuid();
+      const newExpiry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+      sheet.getRange(i + 2, 25).setValue(newToken);
+      sheet.getRange(i + 2, 26).setValue(newExpiry);
+      try {
+        sendPendingAccountEmail(said, name, email, newToken);
+      } catch(e) {
+        return { error: "Failed to send email: " + e.message };
+      }
+      return { ok: true };
+    }
+  }
+  return { error: "No pending profile found for this email." };
+}
+
 function requestEmailChange(payload) {
   const { said, sessionToken, newEmail } = payload;
   if (!said || !sessionToken || !newEmail) return { error: "Missing required fields." };
@@ -719,7 +761,7 @@ function confirmEmailChange(payload) {
 }
 
 function sendPendingAccountEmail(said, name, email, token) {
-  const link = APP_URL + "?completeSAID=" + encodeURIComponent(said) + "&token=" + encodeURIComponent(token);
+  const link = APP_URL + "?completeSAID=" + encodeURIComponent(said) + "&token=" + encodeURIComponent(token) + "&email=" + encodeURIComponent(email);
   MailApp.sendEmail({
     to: email,
     subject: "GrittyOS — Complete your GRIT Fit account setup",

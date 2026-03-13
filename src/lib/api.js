@@ -194,6 +194,16 @@ export async function requestEmailChangeMagicLink(said, sessionToken, newEmail) 
   return res.json();
 }
 
+export async function resendSetupEmail(email) {
+  if (!API_BASE) return { error: "No API configured." };
+  const res = await fetch(`${API_BASE}?action=resendSetupEmail`, {
+    method: "POST",
+    body: JSON.stringify({ email }),
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
 export async function confirmEmailChangeMagicLink(said, token) {
   if (!API_BASE) return { error: "No API configured." };
   const res = await fetch(`${API_BASE}?action=confirmEmailChangeMagicLink`, {

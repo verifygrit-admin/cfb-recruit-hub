@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { createAccount, signIn, forgotPassword, resetPassword, completePendingAccount } from "../lib/api.js";
+import { createAccount, signIn, forgotPassword, resetPassword, completePendingAccount, resendSetupEmail } from "../lib/api.js";
 
 export default function AuthModal({ initialView = "createAccount", prefillEmail = "", said, onAuth, onDismiss, onCreateNew, onReturn, pendingToken }) {
   const [view, setView]             = useState(initialView);
@@ -12,8 +12,9 @@ export default function AuthModal({ initialView = "createAccount", prefillEmail 
   const [loading, setLoading]       = useState(false);
   const [error, setError]           = useState(null);
   const [successMsg, setSuccessMsg] = useState(null);
+  const [pendingSetup, setPendingSetup] = useState(false);  // orphan pending profile detected
 
-  function clearErrors() { setError(null); setSuccessMsg(null); }
+  function clearErrors() { setError(null); setSuccessMsg(null); setPendingSetup(false); }
 
   function switchView(v) { clearErrors(); setPassword(""); setConfirmPw(""); setView(v); }
 
@@ -33,11 +34,26 @@ export default function AuthModal({ initialView = "createAccount", prefillEmail 
 
   async function handleSignIn() {
     if (!email || !password) { setError("Email and password are required."); return; }
-    setLoading(true); setError(null);
+    setLoading(true); setError(null); setPendingSetup(false);
     try {
       const r = await signIn(email, password);
-      if (r.error) { setError(r.error); return; }
+      if (r.error) {
+        setError(r.error);
+        if (r.pendingAccount) setPendingSetup(true);
+        return;
+      }
       onAuth({ said: r.said, email: r.email, sessionToken: r.sessionToken, profile: r.profile });
+    } catch { setError("Something went wrong. Please try again."); }
+    finally { setLoading(false); }
+  }
+
+  async function handleResendSetup() {
+    setLoading(true); setError(null); setSuccessMsg(null);
+    try {
+      const r = await resendSetupEmail(email);
+      if (r.error) { setError(r.error); return; }
+      setPendingSetup(false);
+      setSuccessMsg("Setup email resent — check your inbox to set your password.");
     } catch { setError("Something went wrong. Please try again."); }
     finally { setLoading(false); }
   }
@@ -120,6 +136,11 @@ export default function AuthModal({ initialView = "createAccount", prefillEmail 
             <div className="auth-sub">Access your GRIT Fit results, profile, and Short List.</div>
             {successMsg && <div className="auth-success">{successMsg}</div>}
             {error && <div className="auth-error">{error}</div>}
+            {pendingSetup && (
+              <button className="auth-submit" style={{ marginTop: 0, background: "#7c3aed" }} onClick={handleResendSetup} disabled={loading}>
+                {loading ? "Sending…" : "Resend setup email →"}
+              </button>
+            )}
             <div className="auth-field">
               <label>Email</label>
               <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="Your email" autoFocus />
