@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { POSITIONS } from "../lib/constants.js";
 import { updateRecruit, requestEmailChangeMagicLink } from "../lib/api.js";
+import teamPhoto from "../assets/bchigh-team.jpg";
 
 const PROFILE_SECTIONS = [
   { title: "Identity", fields: [
@@ -125,6 +126,8 @@ export default function SettingsPage({ auth, athlete, onChange, onAwardChange, o
   }
 
   return (
+    <div className="settings-page">
+      <div className="settings-bg-img" style={{ backgroundImage: `url(${teamPhoto})` }} />
     <div className="form-wrapper">
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 4 }}>
         <button
@@ -250,6 +253,7 @@ export default function SettingsPage({ auth, athlete, onChange, onAwardChange, o
       <button className="form-submit" onClick={handleSaveProfile} disabled={saving}>
         {saving ? "Saving…" : "Save Profile →"}
       </button>
+    </div>
     </div>
   );
 }
