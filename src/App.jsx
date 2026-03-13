@@ -203,7 +203,8 @@ export default function App() {
           matchTier:     item.matchTier   || null,
           netCost:       item.netCost    != null ? Number(item.netCost)    : null,
           droi:          item.droi       != null ? Number(item.droi)       : null,
-          breakEven:     item.breakEven  != null ? Number(item.breakEven)  : null,
+          breakEven:     (item.breakEven != null && Number(item.breakEven) > 0) ? Number(item.breakEven)
+                       : (item.droi     != null && Number(item.droi)      > 0) ? 40 / Number(item.droi) : null,
           adltv:         item.adltv      != null ? Number(item.adltv)      : parseMoney(base.adltv),
           dist:          item.dist       != null ? Number(item.dist)       : null,
           addedAt:       item.addedAt    || new Date().toISOString(),
@@ -405,7 +406,8 @@ export default function App() {
                 matchTier:     item.matchTier  || null,
                 netCost:       item.netCost   != null ? Number(item.netCost)   : null,
                 droi:          item.droi      != null ? Number(item.droi)      : null,
-                breakEven:     item.breakEven != null ? Number(item.breakEven) : null,
+                breakEven:     (item.breakEven != null && Number(item.breakEven) > 0) ? Number(item.breakEven)
+                             : (item.droi     != null && Number(item.droi)      > 0) ? 40 / Number(item.droi) : null,
                 adltv:         item.adltv     != null ? Number(item.adltv)     : base.adltv,
                 dist:          item.dist      != null ? Number(item.dist)      : null,
                 crm_contacted: item.crm_contacted === true || item.crm_contacted === "TRUE",

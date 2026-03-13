@@ -57,6 +57,11 @@ function MoneyMap({ shortList }) {
       title: "Fastest Payback",
       sub: "Years to break even",
       items: [...shortList]
+        .map(s => {
+          const be = (s.breakEven != null && s.breakEven > 0) ? s.breakEven
+            : (s.droi != null && s.droi > 0) ? 40 / s.droi : null;
+          return { ...s, breakEven: be };
+        })
         .filter(s => s.breakEven != null && s.breakEven > 0 && s.breakEven < 200)
         .sort((a, b) => a.breakEven - b.breakEven)
         .slice(0, 8),
