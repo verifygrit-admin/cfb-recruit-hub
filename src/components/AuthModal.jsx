@@ -98,8 +98,8 @@ export default function AuthModal({ initialView = "createAccount", prefillEmail 
         {/* ── Create Account ── */}
         {view === "createAccount" && (
           <>
-            <div className="auth-title">Create Your Account</div>
-            <div className="auth-sub">Save your GRIT Fit results and access your Short List from any device.</div>
+            <div className="auth-title">{pendingToken ? "Complete Your Account Access" : "Create Your Account"}</div>
+            <div className="auth-sub">{pendingToken ? "Set a password to activate your GRIT Fit profile and access your results." : "Save your GRIT Fit results and access your Short List from any device."}</div>
             {error && <div className="auth-error">{error}</div>}
             <div className="auth-field">
               <label>Email</label>
