@@ -652,22 +652,20 @@ function requestEmailChange(payload) {
   if (!storedExpiry || new Date() > new Date(storedExpiry)) return { error: "Session expired." };
   const existingRow = findAuthRow(authSheet, 2, newEmail);
   if (existingRow > 0 && existingRow !== authRow) return { error: "This email is already in use by another account." };
-  const verifyCode  = String(Math.floor(100000 + Math.random() * 900000));
-  const codeExpiry  = new Date(Date.now() + 15 * 60 * 1000).toISOString();
-  authSheet.getRange(authRow, 13).setValue(newEmail);
-  authSheet.getRange(authRow, 14).setValue(verifyCode);
-  authSheet.getRange(authRow, 15).setValue(codeExpiry);
-  try {
-    MailApp.sendEmail({
-      to: newEmail,
-      subject: "GrittyOS — Verify your new email address",
-      name: "GrittyOS",
-      body: "You requested to change your GrittyOS account email to this address.\n\nEnter this 6-digit code to confirm:\n\n" + verifyCode + "\n\nThis code expires in 15 minutes.\n\nIf you did not request this change, contact us at verifygrit@gmail.com.\n\nStay Gritty,\nThe GrittyOS Team",
-    });
-  } catch(e) {
-    return { error: "Failed to send verification email: " + e.message };
+  authSheet.getRange(authRow, 2).setValue(newEmail);
+  const ss = SpreadsheetApp.openById(GRITTY_DB_SHEET_ID);
+  const recruitSheet = ss.getSheetByName(RECRUITS_TAB_NAME);
+  if (recruitSheet) {
+    const lastRow = recruitSheet.getLastRow();
+    for (let row = 2; row <= lastRow; row++) {
+      if (String(recruitSheet.getRange(row, 1).getValue()) === String(said)) {
+        recruitSheet.getRange(row, 7).setValue(newEmail);
+        break;
+      }
+    }
   }
-  return { ok: true };
+  logAuth(said, newEmail, "email_changed_direct", "");
+  return { ok: true, email: newEmail };
 }
 
 function requestEmailChangeMagicLink(payload) {
