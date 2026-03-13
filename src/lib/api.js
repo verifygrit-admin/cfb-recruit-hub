@@ -2,6 +2,16 @@
 // Set this after deploying the Apps Script (see /apps-script/Code.gs)
 export const API_BASE = import.meta.env.VITE_API_BASE || "";
 
+// Apps Script Web App URLs issue an HTTP redirect. Some mobile browsers convert
+// POST → GET on redirect, causing the URL ?action= param to be lost. Including
+// action in the POST body ensures it survives as a fallback (doPost reads both).
+function post(action, body = {}) {
+  return fetch(`${API_BASE}?action=${action}`, {
+    method: "POST",
+    body: JSON.stringify({ action, ...body }),
+  });
+}
+
 export async function fetchSchools() {
   if (!API_BASE) throw new Error("VITE_API_BASE not set. See README.");
   const res = await fetch(`${API_BASE}?action=db`);
@@ -27,13 +37,12 @@ export async function geocodeHighSchool(name, state) {
   const alreadyHasSchool = nameLC.includes("school") || nameLC.includes("academy")
     || nameLC.includes("prep") || nameLC.includes("institute");
 
-  // Build ordered list of query strings to try
   const queries = [];
   if (!alreadyHasSchool) {
-    queries.push(`${name} high school, ${state}, USA`); // most specific — bias toward schools
-    queries.push(`${name} School, ${state}, USA`);       // handles "Belmont Hill School"-style names
+    queries.push(`${name} high school, ${state}, USA`);
+    queries.push(`${name} School, ${state}, USA`);
   }
-  queries.push(`${name}, ${state}, USA`);                // original fallback
+  queries.push(`${name}, ${state}, USA`);
 
   try {
     for (const q of queries) {
@@ -62,40 +71,28 @@ export async function checkEmail(email) {
 
 export async function saveRecruit(profile) {
   if (!API_BASE) throw new Error("VITE_API_BASE not set. See README.");
-  const res = await fetch(`${API_BASE}?action=saveRecruit`, {
-    method: "POST",
-    body: JSON.stringify(profile),
-  });
+  const res = await post("saveRecruit", profile);
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
 }
 
 export async function updateRecruit(profile) {
   if (!API_BASE) throw new Error("VITE_API_BASE not set. See README.");
-  const res = await fetch(`${API_BASE}?action=updateRecruit`, {
-    method: "POST",
-    body: JSON.stringify(profile),
-  });
+  const res = await post("updateRecruit", profile);
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
 }
 
 export async function createAccount(email, password, said) {
   if (!API_BASE) throw new Error("VITE_API_BASE not set.");
-  const res = await fetch(`${API_BASE}?action=createAccount`, {
-    method: "POST",
-    body: JSON.stringify({ email, password, said, userAgent: navigator.userAgent }),
-  });
+  const res = await post("createAccount", { email, password, said, userAgent: navigator.userAgent });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
 }
 
 export async function signIn(email, password) {
   if (!API_BASE) throw new Error("VITE_API_BASE not set.");
-  const res = await fetch(`${API_BASE}?action=signIn`, {
-    method: "POST",
-    body: JSON.stringify({ email, password, userAgent: navigator.userAgent }),
-  });
+  const res = await post("signIn", { email, password, userAgent: navigator.userAgent });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
 }
@@ -109,40 +106,28 @@ export async function validateToken(said, token) {
 
 export async function signOut(said, token) {
   if (!API_BASE || !said) return;
-  const res = await fetch(`${API_BASE}?action=signOut`, {
-    method: "POST",
-    body: JSON.stringify({ said, token, userAgent: navigator.userAgent }),
-  });
+  const res = await post("signOut", { said, token, userAgent: navigator.userAgent });
   if (!res.ok) return;
   return res.json();
 }
 
 export async function forgotPassword(email) {
   if (!API_BASE) throw new Error("VITE_API_BASE not set.");
-  const res = await fetch(`${API_BASE}?action=forgotPassword`, {
-    method: "POST",
-    body: JSON.stringify({ email }),
-  });
+  const res = await post("forgotPassword", { email });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
 }
 
 export async function resetPassword(email, code, newPassword) {
   if (!API_BASE) throw new Error("VITE_API_BASE not set.");
-  const res = await fetch(`${API_BASE}?action=resetPassword`, {
-    method: "POST",
-    body: JSON.stringify({ email, code, newPassword, userAgent: navigator.userAgent }),
-  });
+  const res = await post("resetPassword", { email, code, newPassword, userAgent: navigator.userAgent });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
 }
 
 export async function saveShortList(said, schools) {
   if (!API_BASE || !said) return;
-  const res = await fetch(`${API_BASE}?action=saveShortList`, {
-    method: "POST",
-    body: JSON.stringify({ said, schools }),
-  });
+  const res = await post("saveShortList", { said, schools });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
 }
@@ -156,60 +141,42 @@ export async function getShortList(said) {
 
 export async function completePendingAccount(said, pendingToken, password) {
   if (!API_BASE) return { error: "No API configured." };
-  const res = await fetch(`${API_BASE}?action=completePendingAccount`, {
-    method: "POST",
-    body: JSON.stringify({ said, pendingToken, password }),
-  });
+  const res = await post("completePendingAccount", { said, pendingToken, password });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
 }
 
 export async function requestEmailChange(said, sessionToken, newEmail) {
   if (!API_BASE) return { error: "No API configured." };
-  const res = await fetch(`${API_BASE}?action=requestEmailChange`, {
-    method: "POST",
-    body: JSON.stringify({ said, sessionToken, newEmail }),
-  });
+  const res = await post("requestEmailChange", { said, sessionToken, newEmail });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
 }
 
 export async function confirmEmailChange(said, verifyCode) {
   if (!API_BASE) return { error: "No API configured." };
-  const res = await fetch(`${API_BASE}?action=confirmEmailChange`, {
-    method: "POST",
-    body: JSON.stringify({ said, verifyCode }),
-  });
+  const res = await post("confirmEmailChange", { said, verifyCode });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
 }
 
 export async function requestEmailChangeMagicLink(said, sessionToken, newEmail) {
   if (!API_BASE) return { error: "No API configured." };
-  const res = await fetch(`${API_BASE}?action=requestEmailChangeMagicLink`, {
-    method: "POST",
-    body: JSON.stringify({ said, sessionToken, newEmail }),
-  });
+  const res = await post("requestEmailChangeMagicLink", { said, sessionToken, newEmail });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
 }
 
 export async function resendSetupEmail(email) {
   if (!API_BASE) return { error: "No API configured." };
-  const res = await fetch(`${API_BASE}?action=resendSetupEmail`, {
-    method: "POST",
-    body: JSON.stringify({ email }),
-  });
+  const res = await post("resendSetupEmail", { email });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
 }
 
 export async function confirmEmailChangeMagicLink(said, token) {
   if (!API_BASE) return { error: "No API configured." };
-  const res = await fetch(`${API_BASE}?action=confirmEmailChangeMagicLink`, {
-    method: "POST",
-    body: JSON.stringify({ said, token }),
-  });
+  const res = await post("confirmEmailChangeMagicLink", { said, token });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
 }

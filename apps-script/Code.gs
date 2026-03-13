@@ -25,9 +25,9 @@ function doGet(e) {
 }
 
 function doPost(e) {
-  const action = e.parameter.action || "";
   try {
     const body = e.postData ? JSON.parse(e.postData.contents) : {};
+    const action = e.parameter.action || body.action || "";
     if (action === "saveRecruit")   return jsonResponse(saveRecruit(body));
     if (action === "updateRecruit") return jsonResponse(updateRecruit(body));
     if (action === "saveShortList") return jsonResponse(saveShortList(body));
