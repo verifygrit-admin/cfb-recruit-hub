@@ -1,60 +1,59 @@
- name: Claude PR Review
+name: Claude PR Review
 
-  on:
-    pull_request:
-      types: [opened, synchronize]
+on:
+  pull_request:
+    types: [opened, synchronize]
 
-  jobs:
-    review:
-      runs-on: ubuntu-latest
-      permissions:
-        pull-requests: write
-        contents: read
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      contents: read
 
-      steps:
-        - uses: actions/checkout@v4
-          with:
-            fetch-depth: 0
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-        - name: Get PR diff
-          id: diff
-          run: |
-            git diff origin/${{ github.base_ref }}...HEAD > pr_diff.txt
-            echo "Diff size: $(wc -l < pr_diff.txt) lines"
+      - name: Get PR diff
+        id: diff
+        run: |
+          git diff origin/${{ github.base_ref }}...HEAD > pr_diff.txt
+          echo "Diff size: $(wc -l < pr_diff.txt) lines"
 
-        - name: Run Claude Review
-          env:
-            ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          run: |
-            DIFF=$(cat pr_diff.txt)
-            RESPONSE=$(curl -s https://api.anthropic.com/v1/messages \
-              -H "x-api-key: $ANTHROPIC_API_KEY" \
-              -H "anthropic-version: 2023-06-01" \
-              -H "content-type: application/json" \
-              -d "{
-                \"model\": \"claude-sonnet-4-6\",
-                \"max_tokens\": 1024,
-                \"messages\": [{
-                  \"role\": \"user\",
-                  \"content\": \"Review this pull request diff. Be concise. Flag bugs, security issues, and significant
-  logic errors. Skip minor style feedback.\n\n\`\`\`diff\n$(echo "$DIFF" | head -500)\n\`\`\`\"
-                }]
-              }")
-            echo "$RESPONSE" | python3 -c "
-            import json, sys
-            data = json.load(sys.stdin)
-            print(data['content'][0]['text'])
-            " > review_comment.txt
+      - name: Run Claude Review
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          DIFF=$(cat pr_diff.txt)
+          RESPONSE=$(curl -s https://api.anthropic.com/v1/messages \
+            -H "x-api-key: $ANTHROPIC_API_KEY" \
+            -H "anthropic-version: 2023-06-01" \
+            -H "content-type: application/json" \
+            -d "{
+              \"model\": \"claude-sonnet-4-6\",
+              \"max_tokens\": 1024,
+              \"messages\": [{
+                \"role\": \"user\",
+                \"content\": \"Review this pull request diff. Be concise. Flag bugs, security issues, and significant logic errors. Skip minor style feedback.\n\n\`\`\`diff\n$(echo "$DIFF" | head -500)\n\`\`\`\"
+              }]
+            }")
+          echo "$RESPONSE" | python3 -c "
+          import json, sys
+          data = json.load(sys.stdin)
+          print(data['content'][0]['text'])
+          " > review_comment.txt
 
-        - name: Post comment on PR
-          env:
-            GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          run: |
-            COMMENT=$(cat review_comment.txt)
-            gh pr comment ${{ github.event.pull_request.number }} \
-              --body "## Claude Code Review
+      - name: Post comment on PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          COMMENT=$(cat review_comment.txt)
+          gh pr comment ${{ github.event.pull_request.number }} \
+            --body "## Claude Code Review
 
-            $COMMENT
+          $COMMENT
 
-            ---
-            *Reviewed by Claude Sonnet 4.6*"
+          ---
+          *Reviewed by Claude Sonnet 4.6*"
