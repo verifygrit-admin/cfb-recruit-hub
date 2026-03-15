@@ -74,24 +74,29 @@ Notes:
 
 ── FLOW 3: Edit My Profile — Email Change ────────────────────────────────────
 Goal: Signed-in user edits their profile and changes their email address →
-      6-digit verification code sent to the NEW email → user enters code in
-      verify modal → email updated in both Auth tab and Recruits tab.
+      magic link sent to the NEW email → user clicks link → email updated
+      in both Auth tab and Recruits tab.
+
+NOTE: Updated 2026-03-22 — 6-digit code path was removed in v1.1.3.
+      Email change now uses magic link only (requestEmailChangeMagicLink /
+      confirmEmailChangeMagicLink). Original spec described 6-digit flow
+      which no longer exists.
 
 Steps:
   1. Sign in with existing account (email-A)
   2. Open Edit My Profile
   3. Change email field to a new address (email-B) — keep all other fields
   4. Save / Submit
-  5. Expect: verify modal appears ("check your email for a 6-digit code")
-  6. Check email-B inbox for GrittyOS verification email
-  7. Enter 6-digit code in modal
-  8. Expect: success — profile updated, session email updated to email-B
+  5. Expect: confirmation message that a magic link has been sent to email-B
+  6. Check email-B inbox for GrittyOS email change link
+  7. Click the magic link
+  8. Expect: app opens, email change confirmed, session email updated to email-B
   9. Sign out and sign back in with email-B to confirm
 
 Pass criteria:
-  - requestEmailChange API call succeeds
-  - Code email arrives at email-B within ~30s
-  - confirmEmailChange updates Auth col 2 to email-B
+  - requestEmailChangeMagicLink API call succeeds
+  - Magic link email arrives at email-B within ~30s
+  - confirmEmailChangeMagicLink updates Auth col 2 to email-B
   - Recruits tab col 7 (email) updated to email-B
   - Old email-A no longer works to sign in
   - email-B signs in successfully
