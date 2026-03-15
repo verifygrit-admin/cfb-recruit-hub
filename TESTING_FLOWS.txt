@@ -28,21 +28,34 @@ Goal: Logged-in user submits GRIT Fit form with an email that differs from
       → frontend shows AuthModal for new account creation → on success shows
       SwitchModal asking whether to switch to the new account.
 
+NOTE: Updated 2026-03-22 — newProfileMode entry point required.
+      The form email field is silently overridden with auth.email on a
+      normal logged-in submit (App.jsx:553). A different-email new SAID
+      is only created when newProfileMode=true, which requires clicking
+      "New Profile" first. Without this step, the form always routes to
+      updateRecruit using auth.email.
+
 Steps:
   1. Sign in with your existing account (e.g. email-A)
-  2. Navigate to GRIT Fit form
-  3. Fill out form using a different email (email-B) — all required fields
-  4. Submit
-  5. Expect: AuthModal appears prompting account creation for email-B
-  6. Create password for email-B account
-  7. Expect: SwitchModal — "Switch to email-B?" with Yes/Stay options
-  8. Test both choices (stay = remain as email-A; switch = log in as email-B)
+  2. Run the GRIT Fit form and get to the results view
+  3. Click "New Profile" button (top of results / form area) — this
+     clears the form and sets newProfileMode=true
+  4. Fill out the blank form using a different email (email-B) —
+     all required fields; use a real email you can check
+  5. Submit
+  6. Expect: AuthModal appears prompting account creation for email-B
+  7. Create password for email-B account
+  8. Expect: SwitchModal — "Switch to email-B?" with Yes/Stay options
+  9. Test Stay: confirm session remains as email-A
+  10. Re-run steps 1–8, then test Switch: confirm session logs in as email-B
 
 Pass criteria:
   - New SAID created in Recruits tab with status "pending" → "active"
   - New row in Auth tab for email-B
   - SwitchModal appears with correct email shown
   - "Stay" keeps session as email-A; "Switch" logs in as email-B
+  - Normal form submit while logged in (without New Profile click) does
+    NOT create a new SAID — routes to updateRecruit with auth.email
 
 Status: [ ]
 Notes:
