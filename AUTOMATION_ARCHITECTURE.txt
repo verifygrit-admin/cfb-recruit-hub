@@ -1,8 +1,10 @@
 CFB RECRUIT HUB — AUTOMATION ARCHITECTURE
 GrittyOS / VerifyGrit
-Last Updated: March 2026
+Last Updated: 2026-03-22
 TPM: Chris Conroy
-Status: Decision Pending — Do Not Build Until Resolved
+Status: DECIDED — Option B (Supabase) confirmed 2026-03-15 (DEC-CFB-001)
+         Supabase account provisioned + linked to GitHub 2026-03-16 (DEC-CFB-001-A)
+         Stage 1 close-out in progress — Stage 2 spec not yet started
 
 ================================================================
 PURPOSE OF THIS DOCUMENT
