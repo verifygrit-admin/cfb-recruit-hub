@@ -1,0 +1,179 @@
+CFB Recruit Hub — Auth & Profile Testing Flows
+===============================================
+Apps Script must be manually redeployed after any Code.gs change before testing.
+Live app: https://verifygrit-admin.github.io/cfb-recruit-hub/
+
+STATUS KEY:  [ ] Not tested  [x] Passed  [!] Bug found  [-] Skipped
+
+
+── FLOW 1: Submit New Profile While Logged In (Different Email) ──────────────
+Goal: Logged-in user submits GRIT Fit form with an email that differs from
+      their current session email → backend creates a new SAID via saveRecruit
+      → frontend shows AuthModal for new account creation → on success shows
+      SwitchModal asking whether to switch to the new account.
+
+Steps:
+  1. Sign in with your existing account (e.g. email-A)
+  2. Navigate to GRIT Fit form
+  3. Fill out form using a different email (email-B) — all required fields
+  4. Submit
+  5. Expect: AuthModal appears prompting account creation for email-B
+  6. Create password for email-B account
+  7. Expect: SwitchModal — "Switch to email-B?" with Yes/Stay options
+  8. Test both choices (stay = remain as email-A; switch = log in as email-B)
+
+Pass criteria:
+  - New SAID created in Recruits tab with status "pending" → "active"
+  - New row in Auth tab for email-B
+  - SwitchModal appears with correct email shown
+  - "Stay" keeps session as email-A; "Switch" logs in as email-B
+
+Status: [ ]
+Notes:
+
+
+── FLOW 2: Magic Link Account Completion ─────────────────────────────────────
+Goal: When a new profile is submitted (saveRecruit), an email is sent to the
+      recruit's address with a ?completeSAID=&token= link. Clicking the link
+      opens the app and shows a password-set modal to activate the account.
+
+Steps:
+  1. Submit GRIT Fit form as a logged-OUT user (or use a fresh email)
+  2. Check the submitted email inbox for GrittyOS setup email
+  3. Click the link in the email (format: ...?completeSAID=GRIT-XXXX&token=UUID&email=...)
+  4. Expect: app opens, password modal appears pre-filled with the SAID
+  5. Set password and submit
+  6. Expect: signed in automatically, profile loaded, redirected to results
+
+Pass criteria:
+  - Link opens app at correct URL
+  - Password modal appears (not sign-in modal)
+  - completePendingAccount API call succeeds
+  - Auth tab row created; Recruits tab status → "active"
+  - Session established — user is logged in immediately after
+
+Status: [ ]
+Notes:
+
+
+── FLOW 3: Edit My Profile — Email Change ────────────────────────────────────
+Goal: Signed-in user edits their profile and changes their email address →
+      6-digit verification code sent to the NEW email → user enters code in
+      verify modal → email updated in both Auth tab and Recruits tab.
+
+Steps:
+  1. Sign in with existing account (email-A)
+  2. Open Edit My Profile
+  3. Change email field to a new address (email-B) — keep all other fields
+  4. Save / Submit
+  5. Expect: verify modal appears ("check your email for a 6-digit code")
+  6. Check email-B inbox for GrittyOS verification email
+  7. Enter 6-digit code in modal
+  8. Expect: success — profile updated, session email updated to email-B
+  9. Sign out and sign back in with email-B to confirm
+
+Pass criteria:
+  - requestEmailChange API call succeeds
+  - Code email arrives at email-B within ~30s
+  - confirmEmailChange updates Auth col 2 to email-B
+  - Recruits tab col 7 (email) updated to email-B
+  - Old email-A no longer works to sign in
+  - email-B signs in successfully
+
+Status: [ ]
+Notes:
+
+
+── FLOW 4: Edit My Profile — Same Email (Silent Update) ──────────────────────
+Goal: Signed-in user edits profile fields (not email) → updateRecruit called →
+      no modal, no email sent, profile silently updated in Recruits tab.
+
+Steps:
+  1. Sign in with existing account
+  2. Open Edit My Profile
+  3. Change one or more fields (e.g. height, weight, GPA) — do NOT change email
+  4. Save / Submit
+  5. Expect: no modal, no email, immediate success feedback
+  6. Verify updated values appear in profile view
+
+Pass criteria:
+  - updateRecruit API call (not saveRecruit)
+  - No AuthModal or email verify modal shown
+  - Recruits tab row updated with new values
+  - SAID unchanged
+
+Status: [ ]
+Notes:
+
+
+── FLOW 5: GPA-Fail / No Top-50 While Logged In ──────────────────────────────
+Goal: Signed-in user submits GRIT Fit form but fails the GPA threshold or
+      has no top-50 school matches → should call updateRecruit (update existing
+      profile) rather than saveRecruit (create new record).
+
+Steps:
+  1. Sign in with existing account
+  2. Navigate to GRIT Fit form
+  3. Enter same email as your account
+  4. Set GPA below the minimum threshold (e.g. 1.5) OR ensure no top-50 matches
+  5. Submit
+  6. Expect: failure/no-results state shown; no new SAID created
+  7. Verify Recruits tab — row updated (timestamp refreshed), no duplicate row
+
+Pass criteria:
+  - updateRecruit called (check network tab or Recruits sheet — no new row)
+  - No AuthModal shown (already authenticated)
+  - No new SAID generated
+  - Existing row timestamp updated
+
+Status: [ ]
+Notes:
+
+
+── FLOW 6: Short List Persistence Across Sign Out / Sign In ──────────────────
+Goal: Short list saved to server (SL-{SAID} tab) is restored correctly when
+      user signs back in — localStorage sync is gated on confirmed auth.
+
+Steps:
+  1. Sign in, add 3+ schools to short list
+  2. Confirm short list saves (check SL-{SAID} tab in Google Sheet)
+  3. Sign out
+  4. Verify short list is cleared from UI
+  5. Sign back in with same account
+  6. Expect: short list restored from server
+
+Pass criteria:
+  - Short list visible after sign-in matches what was saved before sign-out
+  - No ghost short list items from previous session in localStorage
+  - getShortList API call fires on auth restore
+
+Status: [x] FIXED (commit 25373d9 — sync effect gated on auth)
+Notes: Fixed prior to test session. Sync effect was firing before auth confirmed,
+       causing localStorage restore to overwrite server data.
+
+
+── REGRESSION CHECKS (run after any Code.gs or App.jsx change) ───────────────
+  [ ] Sign in → sign out → sign in (session token flow)
+  [ ] Forgot password → reset code email → new password → sign in
+  [ ] Submit form logged out → pending email sent → magic link (Flow 2)
+  [ ] Short list saves and restores (Flow 6)
+
+
+── NOTES ─────────────────────────────────────────────────────────────────────
+Apps Script sheet structure (Recruits tab):
+  Cols 1-23:  Profile data (SAID, timestamp, name ... allState)
+  Col 24:     status ("pending" → "active")
+  Col 25:     pendingToken
+  Col 26:     pendingTokenExpiry
+
+Apps Script sheet structure (Auth tab):
+  Cols 1-12:  SAID, email, passwordHash, salt, sessionToken, tokenExpiry,
+              resetCode, resetExpiry, createdAt, lastLogin, lastLogout, loginCount
+  Cols 13-15: pendingNewEmail, emailVerifyCode, emailVerifyExpiry
+
+Key files:
+  apps-script/Code.gs         — backend (must manually redeploy after changes)
+  src/lib/api.js              — all API call wrappers
+  src/App.jsx                 — auth state, modal orchestration, URL param handling
+  src/components/AuthModal.jsx
+  src/components/QuickListForm.jsx

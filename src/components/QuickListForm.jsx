@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { POSITIONS } from "../lib/constants.js";
+import teamPhoto from "../assets/bchigh-team.jpg";
 
 const FORM_SECTIONS = [
   { title: "Identity", fields: [
@@ -42,6 +43,8 @@ export default function QuickListForm({ athlete, onChange, onAwardChange, onSubm
   const [activeInfo, setActiveInfo] = useState(null);
 
   return (
+    <div className="settings-page">
+    <div className="settings-bg-img" style={{ backgroundImage: `url(${teamPhoto})` }} />
     <div className="form-wrapper">
       <h2 className="form-title">Student-Athlete Profile</h2>
       <p className="form-subtitle">Enter your data to generate a personalized map of matching NCAA programs. Distance is estimated from your high school — enter your full high school name to ensure the most accurate recruiting reach results.</p>
@@ -182,6 +185,7 @@ export default function QuickListForm({ athlete, onChange, onAwardChange, onSubm
           </button>
         )}
       </div>
+    </div>
     </div>
   );
 }

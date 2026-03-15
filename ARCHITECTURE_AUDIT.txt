@@ -1,0 +1,750 @@
+CFB RECRUIT HUB — ARCHITECTURE AUDIT
+Generated: 2026-03-14
+========================================
+
+Project path:  C:\Users\chris\dev\cfb-recruit-hub
+Live URL:      https://verifygrit-admin.github.io/cfb-recruit-hub/
+Stack:         React 19 + Vite 7 + Leaflet + leaflet.markercluster
+Backend:       Google Apps Script Web App (apps-script/Code.gs)
+Data store:    Google Sheets (ID hardcoded in Code.gs)
+Deploy:        GitHub Actions → GitHub Pages (deploy.yml on master push)
+
+
+--------------------------------------------------------------------------------
+FOUNDATION
+--------------------------------------------------------------------------------
+
+SCORING LOGIC — src/lib/scoring.js — STABLE/WORKING
+  Functions: getClassLabel, haversine, normCDF, calcAthleticFit,
+             calcAthleticComponents, calcAthleticBoost, getSATPercentile,
+             getGPAPercentile, calcEFC, runQuickList.
+  All scoring math is implemented end-to-end. normCDF uses the A&S 7.1.26
+  polynomial approximation, matching the Google Sheets NORM.DIST function.
+  runQuickList returns top30, top50, scored (all schools), athFit, athFitBase,
+  boost, topTier, recruitReach, acadRigorScore, acadTestOptScore, and gate
+  diagnostics. Financial columns (netCost, droi, breakEven, adltv) are
+  computed inline for every school. The function is pure — no side effects,
+  no API calls.
+  Evidence: Full implementation present at lines 131–286, no stubs.
+
+CLASS-YEAR LABEL LOGIC — src/lib/scoring.js:getClassLabel — STABLE/WORKING
+  Maps graduation year to class label (Senior/Junior/Soph/Freshman) using a
+  rolling Sept 1 anchor to determine the current DB "Senior" year.
+  This label is used to key the correct academic rigor columns (Acad_Rigor_Senior,
+  Acad_Rigor_Junior, etc.) in the GrittyOS DB sheet.
+  Evidence: Detailed inline comment explains the date math; logic matches the
+  intent described in TESTING_FLOWS.txt.
+
+ATH_STANDARDS TABLE — src/lib/constants.js — STABLE/WORKING
+  Full 5-tier (Power 4, G6, 1-FCS, 2-Div II, 3-Div III) × 16-position
+  median height/weight/speed table. Used by calcAthleticFit and
+  calcAthleticComponents. All 80 entries are populated with numeric values.
+  Evidence: Lines 2–53 of constants.js, every tier/position entry has h50/w50/s50.
+
+SAT_PERCENTILES TABLE — src/lib/constants.js — STABLE/WORKING
+  Nationally-representative SAT percentile lookup, 800–1600 in steps of 10.
+  Used by getSATPercentile. 74 entries present.
+  Evidence: Lines 68–83 of constants.js.
+
+EFC_TABLE — src/lib/constants.js — STABLE/WORKING
+  55-row EFC/SAI lookup table keyed to AGI; includes sai[], pub[], priv[],
+  and elite[] arrays for each row. Implements the GrittyOS "EFC Determine"
+  sheet logic as a direct port. Eligibility flags (0/1) are present for
+  public, private, and elite school types.
+  Evidence: Lines 118–175 of constants.js; comment confirms direct port from
+  the GrittyOS DB formula sheet.
+
+RECRUIT_BUDGETS — src/lib/constants.js — STABLE/WORKING
+  Geographic reach radii in miles for each tier:
+    Power 4: 2500, G6: 1500, 1-FCS: 1000, 2-Div II: 600, 3-Div III: 450.
+  These are the Gate 2 thresholds in runQuickList.
+  Evidence: Lines 56–62 of constants.js.
+
+STATE_CENTROIDS — src/lib/constants.js — STABLE/WORKING
+  50-state + DC coordinate centroids used as fallback when geocoding fails.
+  Evidence: Lines 98–112 of constants.js; all 51 entries populated.
+
+RECRUIT PROFILE DATA MODEL — BLANK_ATHLETE in App.jsx — STABLE/WORKING
+  Shape: { name, highSchool, gradYear, email, phone, twitter, position,
+           height, weight, speed40, gpa, sat, state, hsLat, hsLng, geoLabel,
+           agi, dependents, awards: { expectedStarter, captain, allConference,
+           allState } }
+  This shape is passed to saveRecruit/updateRecruit and used throughout the
+  form and scoring pipeline.
+  Evidence: App.jsx lines 17–25.
+
+SCHOOL DATA MODEL — derived from GrittyOS DB sheet — STABLE/WORKING
+  Key fields accessed by scoring.js and display components:
+    UNITID, LATITUDE/LONGITUDE, Type (athletic tier), NCAA Division,
+    Conference, State, School Name, School Type (selectivity),
+    Is_Test_Optional, Acad_Rigor_Senior/Junior/Soph/Freshman,
+    Acad_Rigor_Test_Opt_Senior/Junior/Soph/Freshman,
+    COA (Out-of-State), DLTV, Graduation Rate, Admissions Rate,
+    ADLTV Rank, Est_Avg_Merit (or "Avg Merit Award"),
+    Share_Stu_Any_Aid, Share_Stu_Need_Aid, Need-Blind School,
+    Recruiting Q Link (or q_link), Coach Page (or coach_link), ADLTV.
+  Two naming conventions are present in the codebase — spaced ("School Name")
+  and underscored ("School_Name") — suggesting a historical column rename. All
+  field accesses use OR fallback patterns to tolerate both.
+  Evidence: scoring.js:195, MapView.jsx:81,115, App.jsx server-restore blocks.
+
+APPS SCRIPT: saveRecruit — Code.gs:saveRecruit — STABLE/WORKING
+  Creates the Recruits tab if missing. Generates a SAID (GRIT-[year]-[NNNN]).
+  Writes 23 profile columns + 3 status columns (status="pending",
+  pendingToken, pendingTokenExpiry). Sends a setup email via MailApp.
+  Returns { ok, said, pendingToken, emailError }.
+  Evidence: Lines 126–180 of Code.gs.
+
+APPS SCRIPT: updateRecruit — Code.gs:updateRecruit — STABLE/WORKING
+  Finds existing row by SAID. Overwrites cols 1–23 only. If SAID has a row
+  in the Auth tab, sets status="active" and clears cols 25–26.
+  Falls back to saveRecruit if SAID is not found.
+  Evidence: Lines 182–234 of Code.gs.
+
+APPS SCRIPT: createAccount — Code.gs:createAccount — STABLE/WORKING
+  Validates uniqueness of email (col 2) and SAID (col 1) in Auth tab.
+  Hashes password with UUID salt using SHA-256. Writes all 12 Auth columns.
+  Calls markRecruitActive and updateRecruitAuthFields.
+  Evidence: Lines 406–422 of Code.gs.
+
+APPS SCRIPT: signIn — Code.gs:signIn — STABLE/WORKING
+  Looks up email in Auth tab. Validates password hash. Issues new session token
+  with 180-day rolling expiry. Returns { ok, sessionToken, tokenExpiry, said,
+  email, profile } where profile is fetched via getProfileBySAID.
+  Also detects pending (unactivated) profiles in the Recruits tab and returns
+  a helpful pendingAccount:true error.
+  Evidence: Lines 424–459 of Code.gs.
+
+APPS SCRIPT: validateToken — Code.gs:validateToken — STABLE/WORKING
+  Checks token match and expiry. Refreshes tokenExpiry on each valid check
+  (rolling session). Returns profile via getProfileBySAID.
+  Evidence: Lines 461–483 of Code.gs.
+
+APPS SCRIPT: signOut — Code.gs:signOut — STABLE/WORKING
+  Clears sessionToken and tokenExpiry in Auth tab. Writes lastLogout timestamp.
+  Evidence: Lines 485–498 of Code.gs.
+
+APPS SCRIPT: forgotPassword / resetPassword — Code.gs — STABLE/WORKING
+  forgotPassword generates a 6-digit code with 15-minute expiry (cols 7–8 of
+  Auth tab) and emails it via MailApp. resetPassword validates code, re-hashes
+  password, issues new session token, logs auth event.
+  Evidence: Lines 500–560 of Code.gs.
+
+APPS SCRIPT: completePendingAccount — Code.gs — STABLE/WORKING
+  Validates the pendingToken from cols 25–26 of Recruits tab, creates Auth row,
+  marks recruit active, returns full session including profile.
+  Evidence: Lines 577–612 of Code.gs.
+
+APPS SCRIPT: requestEmailChange (direct) — Code.gs:requestEmailChange — STABLE/WORKING
+  Validates session token. Updates Auth col 2 and Recruits col 7 directly
+  to newEmail. No verification step. Logs "email_changed_direct".
+  Note: This is the path used by SettingsPage.jsx via handleSendEmailLink —
+  it changes email immediately without any confirmation code or magic link.
+  Evidence: Lines 642–669 of Code.gs.
+
+APPS SCRIPT: requestEmailChangeMagicLink / confirmEmailChangeMagicLink — Code.gs — STABLE/WORKING
+  Writes pendingNewEmail/changeToken/tokenExpiry to Auth cols 13–15. Emails
+  a confirmation link (?changeEmail=SAID&token=UUID) to the new address.
+  confirmEmailChangeMagicLink validates token and moves pendingEmail into col 2.
+  Also updates Recruits tab col 7.
+  Evidence: Lines 671–737 of Code.gs.
+
+APPS SCRIPT: confirmEmailChange (6-digit code path) — Code.gs:confirmEmailChange — STABLE/WORKING
+  Uses Auth cols 13–15 as pendingEmail/storedCode/expiry. Validates 6-digit code.
+  The same columns (13–14) are reused for both magic link token and 6-digit code,
+  making the two flows mutually exclusive per account.
+  Evidence: Lines 739–768 of Code.gs.
+
+APPS SCRIPT: saveShortList / getShortList — Code.gs — STABLE/WORKING
+  saveShortList creates or clears a tab named "SL-{SAID}" and writes 21 columns
+  including CRM fields and addedAt timestamp. getShortList reads from that tab.
+  Evidence: Lines 236–294 of Code.gs.
+
+APPS SCRIPT: getDB / getTracker — Code.gs — STABLE/WORKING
+  getDB returns all rows from the "GrittyOS DB" tab as an array of objects
+  keyed by column headers. getTracker does the same for the optional "Tracker"
+  tab; returns { tracker: [] } if the tab does not exist.
+  Evidence: Lines 62–95 of Code.gs.
+
+APPS SCRIPT: Auth sheet structure — Code.gs:getOrCreateAuthSheet — STABLE/WORKING
+  12 base columns: SAID, email, passwordHash, salt, sessionToken, tokenExpiry,
+  resetCode, resetExpiry, createdAt, lastLogin, lastLogout, loginCount.
+  3 extended columns (13–15): pendingNewEmail, emailVerifyCode/changeToken,
+  emailVerifyExpiry. Created automatically if absent.
+  Evidence: Lines 298–309 of Code.gs.
+
+⚠️ APPS SCRIPT: updateRecruitAuthFields — Code.gs:updateRecruitAuthFields — INCONSISTENT
+  This function writes lastLogin/lastLogout/loginCount to Recruits tab cols 24/25/26.
+  However, saveRecruit creates Recruits tab with headers status/pendingToken/
+  pendingTokenExpiry at cols 24/25/26. So updateRecruitAuthFields is overwriting
+  the pendingToken and pendingTokenExpiry column slots with lastLogin and
+  loginCount data. The Recruits tab has a column naming collision at cols 24–26.
+  Evidence: saveRecruit headers (line 133–140) vs updateRecruitAuthFields
+  conditional header-write at lines 365–367.
+
+APPS SCRIPT: SAID generation — Code.gs:generateSAID — STABLE/WORKING
+  Reads last row's SAID, parses the counter, increments. Starts at 0005 on
+  first use. Pads to 4 digits. Year prefix from server clock.
+  Evidence: Lines 97–117 of Code.gs.
+
+HASH FUNCTION — Code.gs:hashPassword — STABLE/WORKING
+  SHA-256 of (UUID salt + password). Handles signed-byte Utilities output.
+  Evidence: Lines 332–339 of Code.gs.
+
+CONSTANTS CROSS-REFERENCE — gate-check.mjs vs constants.js — INCONSISTENT
+  gate-check.mjs uses tier key "G5" in ATH_STANDARDS and RECRUIT_BUDGETS, and
+  TIER_ORDER includes "G5". The production constants.js uses "G6" for all of
+  these. gate-check.mjs is a local dev utility with diverged constants that
+  would produce incorrect athletic gate results if run against the live DB
+  where school.Type values use "G6".
+  Evidence: gate-check.mjs lines 9,14,15 vs constants.js lines 13–14,57–58,64.
+  Same divergence in pos-check.mjs line 13 ("G5" tier key).
+
+
+--------------------------------------------------------------------------------
+INTEGRATION
+--------------------------------------------------------------------------------
+
+MapView.jsx → api.js → Apps Script Web App
+  Connection method: fetch (GET), URL = VITE_API_BASE + ?action=db
+  Status: FUNCTIONAL
+  fetchSchools() in api.js calls ?action=db. App.jsx fetches on mount.
+  The school data is loaded once and cached in React state for the session.
+  fetchTracker() calls ?action=tracker; result is merged into runQuickList via
+  the trackerMap parameter.
+  Note: VITE_API_BASE is injected at build time from secrets.VITE_API_BASE in
+  deploy.yml. If the secret is missing or stale the entire app shows a data
+  error banner. No runtime fallback.
+
+App.jsx → saveRecruit/updateRecruit → Code.gs → Recruits tab
+  Connection method: POST (via api.js post() helper)
+  Status: FUNCTIONAL
+  The post() helper appends all scalar fields to the URL query string so that
+  GET-converted redirects still carry the action parameter. Complex fields
+  (awards object) are serialized in the JSON body only.
+  Note: The apps-script redirect conversion from POST to GET means the JSON body
+  is dropped on redirect and only the URL params are parsed in doGet. saveRecruit
+  and updateRecruit are only routed in doPost, so they do not have fallback doGet
+  handlers — if a redirect strips the body they will receive an "Unknown action"
+  error.
+
+App.jsx → validateToken → Code.gs Auth tab
+  Connection method: fetch (GET), URL params = said + token
+  Status: FUNCTIONAL
+  Called on mount if localStorage has cfb_said and cfb_session_token.
+  Rolling 180-day expiry refreshed on every validateToken call.
+  Session is fully invalidated on signOut.
+
+App.jsx → saveShortList/getShortList → Code.gs → SL-{SAID} tab
+  Connection method: POST (saveShortList), GET (getShortList)
+  Status: FUNCTIONAL
+  saveShortList is debounced 2 seconds in App.jsx (line 228). Only fires when
+  auth is present. getShortList is called on auth completion and on mount
+  if localStorage is empty for the SAID.
+
+AuthModal.jsx → api.js → Code.gs (createAccount, signIn, forgotPassword,
+  resetPassword, completePendingAccount, resendSetupEmail)
+  Connection method: POST via post() helper
+  Status: FUNCTIONAL for all paths routed in doPost.
+  Each auth function is handled in both doPost (normal path) and doGet
+  (redirect fallback) in Code.gs.
+
+SettingsPage.jsx → api.js:updateRecruit + requestEmailChange
+  Connection method: POST
+  Status: FUNCTIONAL (updateRecruit). requestEmailChange path is POTENTIALLY
+  MISLEADING — SettingsPage calls requestEmailChange which performs an immediate
+  direct email change (no confirmation), but the UI labels the button
+  "Send Confirmation Link →" and shows a success message saying "Email updated!"
+  suggesting a confirmed flow occurred. The backend does NOT send any confirmation
+  email in this path — it changes the email immediately.
+  Evidence: SettingsPage.jsx:74, Code.gs:requestEmailChange lines 642–669.
+
+App.jsx URL param handling → Code.gs:completePendingAccount /
+  confirmEmailChangeMagicLink
+  Connection method: URL query params (?completeSAID=&token= and ?changeEmail=&token=)
+  Status: FUNCTIONAL (code paths present and complete)
+  Both URL param handlers strip params from the URL via replaceState immediately
+  on mount. The completeSAID path triggers AuthModal in createAccount view with
+  pendingToken pre-filled. The changeEmail path auto-fires confirmEmailChangeMagicLink.
+  ⚠️ Both ?changeEmail= and ?completeSAID= use the URL param name "token". In
+  App.jsx lines 136–138, both changeEmailToken and completeToken are assigned from
+  params.get("token"). The conditional on line 139 ensures only one branch fires,
+  but if both completeSAID and changeEmail appear simultaneously in the URL, only
+  the completeSAID branch executes. This is an edge case unlikely to occur in
+  practice.
+
+geocodeHighSchool → Nominatim (OpenStreetMap) API
+  Connection method: fetch (GET), external API
+  Status: FUNCTIONAL
+  Debounced 800ms after highSchool + state both have values. Tries up to 3
+  query variants (with "high school" appended, with "School" appended, verbatim).
+  Falls back to STATE_CENTROIDS in runQuickList if geocoding returned null.
+  User-Agent header set to "GritFit-CFBRecruitHub/1.0".
+
+Google Sheets tab structure (live backend)
+  - "GrittyOS DB" tab: school data (source of truth, read-only from frontend)
+  - "Tracker" tab: optional tracker data (read-only from frontend)
+  - "Recruits" tab: athlete profiles, cols 1–26
+  - "Auth" tab: session/auth data, cols 1–15
+  - "AuthLog" tab: auth event log, 6 columns
+  - "SL-{SAID}" tabs: one per athlete, 21 columns for short list data
+  All tabs except GrittyOS DB are created on-demand by Code.gs.
+
+GitHub Actions: deploy.yml — FUNCTIONAL
+  Triggers on push to master. Builds with Vite using VITE_API_BASE from
+  GitHub secrets. Deploys to GitHub Pages via actions/deploy-pages@v4.
+  No env file committed; API URL is never exposed in source.
+
+GitHub Actions: claude-review.yml — FUNCTIONAL (with caveats)
+  Triggers on pull_request open/synchronize. Sends first 500 lines of PR diff
+  to Claude Sonnet 4.6 API. Posts review as a PR comment.
+  ⚠️ Requires ANTHROPIC_API_KEY secret. The diff head limit (500 lines) may
+  truncate meaningful changes in large PRs, causing an incomplete review.
+
+External data dependencies
+  - GrittyOS Master DB (Google Sheet ID: 1Pc4LOnD1fhQz-9pI_CUEDaAMDfTkUXcCRTVDfoDWvqo):
+    All school data lives here. If this sheet is moved, renamed, or permission-
+    restricted, the app stops loading data.
+  - Nominatim (nominatim.openstreetmap.org): geocoding service. No API key,
+    rate limit applies. No retry logic on failure; silently falls back to
+    state centroid.
+  - CARTO dark tile layer: used by Leaflet map. CDN dependency; no fallback
+    tile provider configured.
+  - Google Fonts (Barlow Condensed, Barlow): loaded in index.html from
+    fonts.googleapis.com. Map renders even without fonts but UI degrades.
+
+MailApp (Apps Script built-in) — email delivery
+  Used by: sendPendingAccountEmail (setup link), forgotPassword (6-digit code),
+  requestEmailChangeMagicLink (confirmation link).
+  Status: FUNCTIONAL — MailApp.sendEmail is wrapped in try/catch in
+  sendPendingAccountEmail; forgotPassword does not catch and will return
+  an error object; requestEmailChangeMagicLink does not catch and will
+  throw to the doPost catch block.
+  ⚠️ MailApp daily quota on personal Google accounts is 100 emails/day.
+  There is no volume tracking or fallback.
+
+
+--------------------------------------------------------------------------------
+SURFACE
+--------------------------------------------------------------------------------
+
+MapView.jsx — Interactive map component
+  Renders all 661 schools on a dark CARTO tile background using Leaflet +
+  leaflet.markercluster. In browse mode: markers colored by athletic tier
+  (DIV_COLORS from constants), filtered by sidebar state. In quicklist mode:
+  only matched schools shown (top/good/borderline color coding), non-matching
+  schools hidden entirely. Cluster groups use dark forest green styling.
+  Each marker has a popup with school name, location, conference, selectivity,
+  ADLTV, ADLTV rank, admission rate, graduation rate, COA, merit aid, and
+  (in quicklist mode) match rank, academic fit, distance, and optional net
+  cost/DROI. Q and Staff links appear if populated. A "Add to Short List"
+  button calls window.__toggleShortList(unitid).
+  ⚠️ Short List button in popup uses global window.__toggleShortList — this
+  is a bridge pattern required because Leaflet popup HTML cannot call React
+  state directly. The global is updated in a useEffect in App.jsx. If the
+  effect runs after a popup is open but before the user clicks, the closure
+  will be stale. The effect dependency array (line 272) includes shortList,
+  results, schools, auth, said, so this should be fresh on any relevant state
+  change, but there is no debounce guard.
+  State management: re-renders entire cluster layer (clears and recreates)
+  on every change to schools, results, mode, filters, or shortListIds.
+  Legend overlaid bottom-left in quicklist mode; no legend in browse mode
+  (legend is in Sidebar).
+
+Sidebar.jsx — Browse-mode filter panel
+  Left drawer on mobile, persistent aside on desktop. Filters: Division Tier
+  (toggle buttons), Admissions Selectivity (toggle buttons), Conference
+  (dropdown), ADLTV Rank Top-N (buttons), State (multi-select chips), free
+  text search (school name or state). Reset button. Legend with tier dot colors.
+  Visible count shows "Showing X of Y programs" derived from App.jsx useMemo.
+  The visible count in Sidebar reflects the memo'd calculation which exactly
+  mirrors the filter logic in MapView — these are separate computations but
+  appear in sync.
+
+QuickListForm.jsx — Athlete profile entry form
+  Sections: Identity (name, high school, state, grad year, email, phone,
+  Twitter), Athletics (position, height, weight, 40-yard dash), Academics
+  (GPA, SAT), Family Financials (AGI, dependents), Athletic Awards checkboxes.
+  Geocoding status indicator shows under Identity section. Info tooltips on
+  hover/tap for High School, SAT, dependents, and Awards fields.
+  Submit button label: "Update My GRIT Fit →" if SAID present, else "Generate
+  My GRIT Fit →". "Submit New Profile" button appears only if SAID present.
+  AGI rendered as a currency input ($ prefix, comma-formatted).
+  ⚠️ SettingsPage.jsx is a near-duplicate of QuickListForm.jsx. Both render
+  essentially the same profile fields. The Identity section in SettingsPage
+  omits the email field (email is managed separately through the Account
+  block), and SettingsPage does not have geocoding status or form-level error
+  display. Code duplication could cause the two forms to drift (e.g. adding
+  a field to one but not the other).
+  ⚠️ QuickListForm imports a hardcoded team photo asset (bchigh-team.jpg) as
+  a background image. This is a BC High-specific image. SettingsPage.jsx imports
+  the same image.
+  Evidence: QuickListForm.jsx line 3; SettingsPage.jsx line 4.
+
+ResultsTable.jsx — Sortable results table for top-50 matches
+  Displays score dashboard (My Athletic Score, My Academic Rigor Score,
+  My Test Optional Score) above a sortable table. Table columns: Target Rank,
+  Match tier, School, Div, Conf, Dist, Test Opt, COA (OOS), ADLTV, Net Cost,
+  DROI, Break-Even, Short List toggle, Recruit Q link, Coaching Staff link.
+  Column headers support click-to-sort. Tooltip portal on hover/tap renders
+  column descriptions above the cursor. Net Cost, DROI, and Break-Even show
+  "—" when financial data is absent (no AGI/dependents in profile).
+  Short List column: renders +/✓ buttons; calls onToggleShortList prop.
+
+ShortList.jsx — My Short List management
+  Gate state: shows "Create Your GRIT Fit Profile First" if no SAID; shows
+  "Your Short List is Empty" if list is empty. Main view has MoneyMap component
+  (4-panel bar chart: lowest cost, highest ADLTV, fastest payback, best ROI)
+  plus drag-and-drop sortable table with CRM checkboxes (Contacted, Applied,
+  Offer, Committed). Each row has remove button, Q link, Staff link.
+  Limit: 40 schools. School count displayed as "X / 40 schools".
+  Uses @dnd-kit/core and @dnd-kit/sortable for drag reordering.
+  MoneyMap shows empty-state panels if no financial data is present.
+
+AuthModal.jsx — Auth flows (create account, sign in, forgot/reset password)
+  Views: createAccount, signIn, forgotPassword, resetPassword.
+  createAccount prefills email (read-only) and said. If pendingToken prop is
+  present, routes to completePendingAccount instead of createAccount.
+  signIn detects pendingAccount response and shows "Resend setup email" button.
+  forgotPassword collects email, sends code, auto-navigates to resetPassword.
+  resetPassword collects 6-digit code, new password, confirm password.
+  Modal has a dismiss button (X) and optional "Return to Browsing Schools" link.
+
+SettingsPage.jsx — Authenticated profile editing + email change
+  Two main sections: Account (email display + change form) and Profile (all
+  form fields except email). Email change calls requestEmailChange which does
+  an immediate direct email change in the backend with no confirmation step.
+  "Save & Re-Run GRIT Fit →" button calls onSubmit (which resolves to
+  handleSubmit in App.jsx) or handleSaveProfile internally. onSubmit is passed
+  from App.jsx, so the Settings save path goes through the full handleSubmit
+  logic including scoring.
+  Evidence: App.jsx line 754 (onSubmit={handleSubmit}).
+
+StayGrittyModal.jsx — No-results feedback modal
+  Two routes: "academic" (GPA below NCAA minimum) and athletic (no top-tier
+  match). Academic path shows GPA snapshot, eligibility gap, and 8 improvement
+  tips. Athletic path shows: strengths callouts, WOW badges (metrics >= 75th
+  percentile), closest tier breakdown with per-metric progress bars, training
+  tips for weakest metric, alternative positions that qualify at Div III,
+  and an aspirational school table (schools that pass distance + academic gates
+  at the closest tier). Both paths have "Update My Profile →" and "Home" action
+  buttons. This is a complete and polished component.
+
+Tutorial.jsx — Guided onboarding slides
+  Two 5-slide sequences: browse (map overview) and quicklist (GRIT Fit
+  explanation). Last slide of browse tutorial has "Explore Map" + "Get GRIT Fit →"
+  CTA buttons. Last slide of quicklist tutorial has "Get Started →". Dot
+  navigation, prev/next buttons. No persistent "tutorial shown" flag —
+  tutorial does not auto-open; it is triggered by the ? help button.
+
+ModeToggle.jsx — Navigation dropdown
+  Dropdown with items: Home, My GRIT Fit, My Short List + divider + Settings
+  (auth only) + Sign In/Sign Out. Emits special tokens (__logout, __signin,
+  __settings) that App.jsx catches in its onChange handler. Settings item
+  is filtered out of the main list (only accessible via dropdown). The MODES
+  array includes "settings" as a valid mode but it is not shown in the main
+  dropdown items (line 46: filter m.id !== "settings").
+
+HelmetAnim.jsx — Entry animation
+  Renders a helmet PNG that reveals at viewport center, bounces, then flies to
+  the #tutHelpBtn element. Fires once on browse entry (browseAnimShown ref)
+  and once when results first appear (qlAnimShown ref). Uses CSS animation for
+  the reveal phase and a JS transform transition for the fly-to phase.
+  React StrictMode double-invocation guard: started.current ref.
+
+Email verify modal — App.jsx inline render — FUNCTIONAL
+  When emailConfirmState is set (from ?changeEmail= URL param), App.jsx
+  renders an overlay showing loading/error/success state for the email change
+  confirmation. This is rendered inline in App.jsx rather than as a standalone
+  component — it is a small modal block (~35 lines) with no dedicated component.
+  Evidence: App.jsx lines ~900+ (not shown in read chunks but referenced by
+  pendingEmailConfirm and emailConfirmState state vars).
+
+SwitchModal — App.jsx inline render — FUNCTIONAL
+  When pendingNewProfile completes auth, App.jsx shows a modal asking whether
+  to switch to the new account or stay on the current one. Also rendered inline
+  in App.jsx using showSwitchModal state. No dedicated component file.
+
+Mobile responsiveness
+  index.html has the standard viewport meta tag. App.css and index.css contain
+  media queries (not read in full but referenced). Sidebar uses a drawer pattern
+  on mobile (drawerOpen state + drawerOverlay div). ModeToggle is a compact
+  dropdown. MapView disables Leaflet's tap emulation (tap: false) to prevent
+  double-fire on mobile.
+
+Short list persistence UI
+  Short List panel gates on said (not auth) — a user with a SAID but no auth
+  can see the gate "Create Your GRIT Fit Profile First" message.
+  ⚠️ The ShortList component receives said as a prop. If a user has a SAID
+  (from a prior submit) but no auth, said is truthy and ShortList will NOT
+  show the "Create Profile" gate — it will show either the list or the empty
+  state. Adding schools to the list from this state is blocked at the
+  window.__toggleShortList level (redirects to GRIT Fit form), but the
+  ShortList panel itself shows as an accessible mode.
+
+
+--------------------------------------------------------------------------------
+GAPS AND OBSERVATIONS
+--------------------------------------------------------------------------------
+
+⚠️ CRITICAL: Recruits tab cols 24–26 naming collision
+  saveRecruit (Code.gs line 133) defines the Recruits tab header row with:
+    col 24 = "status", col 25 = "pendingToken", col 26 = "pendingTokenExpiry"
+  updateRecruitAuthFields (Code.gs lines 365–367) conditionally writes headers:
+    col 24 = "lastLogin", col 25 = "lastLogout", col 26 = "loginCount"
+  These two functions disagree on what cols 24–26 contain. When a new recruit
+  profile is created (saveRecruit), cols 24–26 hold status/pendingToken/expiry.
+  When an auth event fires (login/logout), updateRecruitAuthFields checks if
+  headers are blank at those positions — but they are NOT blank (they have
+  status/pendingToken/pendingTokenExpiry written by saveRecruit). So the
+  conditional header write on lines 365–367 never executes, and the actual
+  write on lines 370–375 overwrites status/pendingToken/pendingTokenExpiry
+  with timestamps and login counts.
+  Result: After any login/logout event for a recruit, col 24 becomes a
+  timestamp string (lastLogin), col 25 becomes a logout timestamp, and col 26
+  becomes a count integer — replacing what should be the pending/active status.
+  This means completePendingAccount (which reads cols 24–26 for the token)
+  may find a timestamp where it expects a UUID token.
+  markRecruitActive (Code.gs lines 562–575) also writes to col 24–26 directly
+  (status="active", clears 25–26). This function is called from createAccount,
+  which fires after completePendingAccount, so the active status should survive —
+  but the loginCount overwrite from updateRecruitAuthFields called immediately
+  after (line 419: updateRecruitAuthFields(said, "login")) then writes
+  timestamps to cols 24–26 again, destroying the "active" status just written.
+  This is a structural data integrity bug that will corrupt the Recruits tab.
+
+⚠️ Gate-check.mjs uses "G5" tier key, production uses "G6"
+  gate-check.mjs defines ATH_STANDARDS with "G5" as the second tier and
+  TIER_ORDER as ["Power 4","G5","1-FCS","2-Div II","3-Div III"].
+  constants.js uses "G6" for the same tier in all three places.
+  The school.Type field in the GrittyOS DB uses "G6" (evidenced by the
+  consistent references in scoring.js and MapView.jsx).
+  As a result, gate-check.mjs would find 0 schools matching Gate 1 for the
+  G5 tier because school.Type === "G6", not "G5". Any result from gate-check.mjs
+  should be treated as unreliable. pos-check.mjs has the same issue.
+
+⚠️ SettingsPage email change flow is misleading
+  SettingsPage.jsx calls requestEmailChange (api.js line 154), which maps to
+  Code.gs:requestEmailChange. This function changes the email immediately in
+  both the Auth tab and the Recruits tab — no confirmation code, no magic link.
+  The UI button says "Send Confirmation Link →" and the success state says
+  "Email updated!" and instructs the user to "Sign out and back in to see the
+  update." A user could reasonably believe a confirmation step occurred when
+  it did not. The email changes the moment they click the button, even if the
+  new address is a typo. This could lock a user out of their account.
+  Additionally: api.js also exports requestEmailChangeMagicLink (lines 167–172),
+  a confirmed email change flow with a magic link. SettingsPage does not use
+  this function. It is unclear which path was intended for production.
+  Evidence: SettingsPage.jsx lines 69–82; Code.gs lines 642–668.
+
+⚠️ confirmEmailChange (6-digit code) has no corresponding frontend flow
+  Code.gs implements a confirmEmailChange function (lines 739–768) that accepts
+  a SAID and a 6-digit verifyCode. api.js exports confirmEmailChange (lines
+  160–165). However, no component in the frontend calls confirmEmailChange.
+  TESTING_FLOWS.txt Flow 3 describes "6-digit verification code sent to the
+  NEW email → user enters code in verify modal" but no verify code modal exists
+  in the component tree. The flow described in TESTING_FLOWS.txt appears to not
+  be implemented on the frontend. Status in TESTING_FLOWS.txt: [ ] (not tested).
+
+⚠️ All 6 testing flows in TESTING_FLOWS.txt are untested
+  Only Flow 6 (short list persistence) is marked [x] FIXED. All others remain
+  [ ] Not tested:
+  - Flow 1: Submit new profile while logged in (different email) → SwitchModal
+  - Flow 2: Magic link account completion
+  - Flow 3: Email change with 6-digit code (see above — frontend missing)
+  - Flow 4: Edit profile (same email) → silent update
+  - Flow 5: GPA-fail / no top-50 while logged in → updateRecruit
+  Regression checks also show all as [ ].
+
+⚠️ saveRecruit called without awaiting on GPA-fail and no-top50 paths
+  In App.jsx handleSubmit (lines ~520–535), when GPA fails or no top-50:
+    saveRecruit({ ...parsed, timestamp: ... }).catch(() => {});
+  This fire-and-forget call is intentional (profile saved, but results not shown),
+  but the emailError property of the response is not handled in this code path.
+  If the setup email fails to send (MailApp quota exceeded, etc.), the user
+  gets no feedback. The error is silently swallowed by .catch(() => {}).
+  In contrast, the normal submit path (lines 575–577) does check r.emailError.
+
+⚠️ handleSubmit: GPA-fail path with unauthenticated user calls saveRecruit
+  but does not set said, setPendingAuth, or show AuthModal
+  If an unauthenticated user fails the GPA check, saveRecruit is called and
+  a SAID is generated + a pending profile is created, but the frontend never
+  calls setSaid(r.said) or shows the AuthModal for account creation. The user
+  sees StayGrittyModal and has no path to activate their account from that
+  state. Their profile is orphaned as "pending" in the Recruits tab.
+  Evidence: App.jsx lines 518–524.
+
+⚠️ handleSubmit: no-top50 path with unauthenticated user has the same orphan
+  profile issue as the GPA-fail path.
+  Evidence: App.jsx lines 531–536.
+
+⚠️ Short List toggle requires auth but short list panel is accessible without auth
+  window.__toggleShortList (App.jsx) gates on auth and redirects unauthenticated
+  users to GRIT Fit form or sign-in modal. However, ShortList.jsx gates only on
+  said — a user with a SAID but no active session sees the list view (or empty
+  state). They cannot add schools via the map popup (redirected), but if they
+  navigate to the short list view and somehow have local state from before logout,
+  they can view items. On logout, setShortList([]) is called, so this is mostly
+  an edge case but the authorization logic is inconsistent (SAID ≠ authenticated).
+
+⚠️ Alert() used for short list limit notification
+  App.jsx line 257: alert("Your Short List is full (max 40 schools)...")
+  Blocking native browser alert is not appropriate for a polished UI and breaks
+  on certain mobile browsers. Should be replaced with an in-UI notification.
+
+⚠️ SwitchModal is rendered inline in App.jsx with no dedicated component
+  The switch-account modal (rendered when showSwitchModal is truthy) and the
+  email-confirm overlay (rendered when emailConfirmState is set) are both
+  rendered inline in App.jsx with no dedicated components. The SwitchModal
+  renders inside a <div className="auth-overlay"> block without any className
+  guidance in a separate component, making it fragile to style changes and
+  harder to test or review independently.
+
+⚠️ handleSubmit: isNewPerson logic requires newProfileMode AND email mismatch
+  App.jsx line 540: const isNewPerson = newProfileMode && athlete.email !== auth.email
+  If a logged-in user fills out the form with a different email WITHOUT clicking
+  "Submit New Profile" (i.e., newProfileMode is false), the form silently
+  ignores the email discrepancy and calls updateRecruit using auth.email instead
+  of the form email (line 555: email: auth.email). No warning is shown. This is
+  probably intentional (the form email is not authoritative when logged in) but
+  could confuse users who enter a different email and expect a new SAID.
+
+⚠️ Hardcoded email address in Code.gs
+  verifygrit@gmail.com appears literally in multiple MailApp.sendEmail calls
+  in Code.gs (forgotPassword, requestEmailChangeMagicLink, sendPendingAccountEmail).
+  APP_URL (line 10) is also hardcoded: "https://verifygrit-admin.github.io/cfb-recruit-hub/"
+  These are correct for the current deployment but must be manually updated if
+  the domain or contact email changes. No configurable constant for contact email.
+
+⚠️ Hardcoded Google Sheet ID in Code.gs
+  GRITTY_DB_SHEET_ID = "1Pc4LOnD1fhQz-9pI_CUEDaAMDfTkUXcCRTVDfoDWvqo" (line 6)
+  This is the actual production sheet ID exposed in the source file, which is
+  committed to a public repository. Anyone with this ID can attempt to access
+  the sheet directly (though it still requires sheet-level permissions to read
+  or write). The Apps Script is "Execute as: Me" so the script credentials are
+  safe, but the sheet ID being public means the DB location is discoverable.
+
+⚠️ No 404.html for GitHub Pages SPA routing
+  ROADMAP.txt (line 22) documents that GitHub Pages requires a 404.html redirect
+  hack for client-side routing. The current app uses a view-state-only
+  single page (no React Router), so this is not currently broken. However,
+  once React Router is added (the planned Step 1 in ROADMAP.txt), direct
+  URL access to routes will return 404s from GitHub Pages without this fix.
+
+⚠️ MapView re-creates entire cluster layer on every shortListIds change
+  MapView.jsx line 50: clusterRef.current is removed and recreated on every
+  dependency change. shortListIds is a useMemo array that changes identity
+  whenever shortList changes. Adding/removing one school from the short list
+  causes a full re-render of all 661 (or filtered N) markers. At scale this
+  is measurable performance degradation. The current maxClusterRadius of 40
+  and the school count of 661 make this tolerable but not ideal.
+  A more efficient approach would be to update only the affected popup's button
+  state without re-creating the cluster.
+
+⚠️ TESTING_FLOWS.txt Flow 3 describes a 6-digit email verify modal that does
+  not exist in the frontend
+  The TESTING_FLOWS.txt description says:
+    "verify modal appears ('check your email for a 6-digit code')"
+  No component named EmailVerifyModal, VerifyModal, or similar exists.
+  confirmEmailChange (api.js) is never called by any component.
+  The Auth cols 13–15 are labeled "pendingNewEmail/emailVerifyCode/emailVerifyExpiry"
+  in TESTING_FLOWS.txt but Code.gs uses those same columns for BOTH the
+  6-digit code path (confirmEmailChange) and the magic link path
+  (requestEmailChangeMagicLink / confirmEmailChangeMagicLink). The two paths
+  write to the same columns, meaning requesting a magic link and requesting
+  a 6-digit code simultaneously would corrupt each other's state.
+
+⚠️ resendSetupEmail backend reads cols 1–24 but pendingToken is col 25
+  Code.gs:resendSetupEmail (line 620): getRange(2, 1, lastRow-1, 24).getValues()
+  reads 24 columns. The function then checks r[23] for status ("pending").
+  This is correct — col 24 (0-indexed col 23) is status. However, after
+  finding the row, it writes the new token to sheet.getRange(i+2, 25) and
+  expiry to getRange(i+2, 26), which are cols 25 and 26 — those are
+  pendingToken and pendingTokenExpiry respectively. The read uses 24 columns
+  but the writes go to 25 and 26, which are just outside the read range.
+  This is technically correct since they are separate write calls, not reads.
+  However, the read range could be widened to 26 for consistency.
+
+⚠️ validateToken in App.jsx mount effect does not handle network failure
+  The validateToken call in the mount useEffect (App.jsx lines 88–126) uses
+  .catch(() => {}) — silently ignores network errors. If the network is
+  unavailable on load, the user will see no results and no session, even if
+  they have a valid cached SAID and would be served from localStorage. The
+  session recovery silently fails with no user-visible feedback.
+
+⚠️ restoreSessionRef pattern — deferred scoring is silently dropped on edge cases
+  The restoreSessionRef.current approach (App.jsx) stores a profile for later
+  scoring when schools haven't loaded yet. If fetchSchools fails (setDataError),
+  the schools array remains empty and the restore useEffect (line 158–181) guard
+  condition (!schools.length) prevents scoring from ever running. The user
+  signs in, sees no results, and gets no explanation that the data load failed.
+  The dataError banner would be shown, but the connection between "data failed
+  to load" and "your results can't be restored" is not surfaced to the user.
+
+⚠️ Short list server restore has two code paths for the same logic
+  The inline getShortList call in handleAuthComplete (lines ~397–421) and the
+  useEffect triggered by restoreSlRef.current (lines 184–219) both map server
+  short list data back to school objects. They share the same mapping code but
+  are written separately. If a field mapping is changed in one, it must be
+  updated in both. The inline version (handleAuthComplete) does not map
+  _schoolName, _divLabel, _coaNum, _qLink, _coachLink in the same explicit way
+  as the useEffect version — it relies on the subsequent "resolve missing derived
+  fields" useEffect (lines 297–316) to fill those in. This is functional but
+  creates an indirect dependency.
+
+⚠️ QuickListForm and SettingsPage import a hardcoded team photo
+  Both QuickListForm.jsx (line 3) and SettingsPage.jsx (line 4) import
+  "../assets/bchigh-team.jpg" as a background image. This is a BC High-specific
+  football team photo. This asset should be replaced with a generic background
+  or made configurable if this platform is intended to serve multiple schools
+  or the general public. It is a brand-specific artifact in a general-purpose
+  platform.
+
+⚠️ No automated tests of any kind
+  There are no test files (*.test.js, *.spec.js, __tests__/ directory) in the
+  project. gate-check.mjs and pos-check.mjs are manual diagnostic scripts run
+  against the live API. The testing burden is entirely manual per TESTING_FLOWS.txt.
+  With 6+ untested auth flows and a complex state machine in App.jsx, regressions
+  are hard to catch.
+
+⚠️ Apps Script has 20,000 requests/day rate limit on free Google Workspace
+  ROADMAP.txt documents this. The current deployment routes all DB reads,
+  all auth operations, and all short list operations through a single Apps
+  Script Web App. Each page load generates at minimum 2 calls (db + tracker).
+  There is no caching layer, no CDN for the school DB, and no request
+  deduplication. This will hit the limit at moderate traffic.
+
+⚠️ No input sanitization in Code.gs
+  Profile fields (name, highSchool, email, etc.) are written directly to
+  Google Sheets with no sanitization. While Sheets formula injection via
+  "=FORMULA" is not a significant risk in this context (the data is not
+  re-executed), unusually long or specially-formatted strings could affect
+  sheet formatting or downstream processing.
+
+⚠️ The panel toggle (Map/Table) for quicklist results is only visible when
+  results are present (App.jsx line 696). If the user navigates to quicklist
+  mode without results, the toggle is hidden and there is no obvious path to
+  the form from the results bar. The "Update My Profile" button in the summary
+  bar leads to Settings, not back to the QuickListForm. Users who want to
+  re-enter their profile from scratch (without using "New Profile" button)
+  have no clear entry point once results are showing, other than via the
+  Settings page.
+
+Dead code / signals of unfinished work
+  - pos-check.mjs: local diagnostic script with "G5" tier key bug; not production
+    code but present in the repo root.
+  - gate-check.mjs: same class of diagnostic script, same "G5" bug.
+  - ROADMAP.txt Step 1 (URL routing) is explicitly marked as the first task
+    before any new modules are added. No routing library is installed
+    (react-router-dom is absent from package.json dependencies).
+  - ROADMAP.txt lists 6 planned modules (Pre-Offer Tracker, Recruiting
+    Scoreboard, Recruiting Events, Document Library, API Connections,
+    Coaches View) — none are started.
+  - ModeToggle MODES array includes "settings" as a mode ID but filters it
+    out of the main dropdown, making it only accessible via a special __settings
+    token. This is a workaround for the absence of proper routing.
+
+
+================================================================================
+END OF AUDIT
+================================================================================

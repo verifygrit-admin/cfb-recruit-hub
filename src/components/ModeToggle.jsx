@@ -4,6 +4,7 @@ const MODES = [
   { id: "browse",    label: "Home" },
   { id: "quicklist", label: "My GRIT Fit" },
   { id: "shortlist", label: "My Short List" },
+  { id: "settings",  label: "Settings" },
 ];
 
 export default function ModeToggle({ mode, onChange, auth }) {
@@ -42,7 +43,7 @@ export default function ModeToggle({ mode, onChange, auth }) {
       </button>
       {open && (
         <div className="nav-dropdown-menu">
-          {MODES.map(({ id, label }) => (
+          {MODES.filter(m => m.id !== "settings").map(({ id, label }) => (
             <button
               key={id}
               className={`nav-dropdown-item${mode === id ? " active" : ""}`}

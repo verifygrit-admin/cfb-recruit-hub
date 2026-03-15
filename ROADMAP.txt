@@ -1,0 +1,116 @@
+CFB RECRUIT HUB — ROADMAP & NEXT STEPS
+=======================================
+Last updated: 2026-03-13 (Hudl import note added to Coaches View)
+
+
+STEP 1 — URL-BASED ROUTING (do first, before adding more modules)
+------------------------------------------------------------------
+Replace the current single-page view-state system with proper client-side routing
+so each module has its own URL path. This is foundational — every new module
+added after this will have a clean, trackable URL from day one.
+
+Current views to map to routes:
+  /                    → Home (Map View)
+  /my-grit-fit         → My GRIT Fit results (map + table)
+  /profile             → Student-Athlete Profile form (new/logged-out entry)
+  /short-list          → My Short List
+  /settings            → Settings / Profile (logged-in edit)
+
+Recommended library: React Router v6 (react-router-dom)
+
+Notes:
+- GitHub Pages requires a 404.html redirect hack for client-side routing
+  (copy index.html to 404.html, or use HashRouter as a simpler alternative)
+- Once on a real domain with a proper server/CDN, use BrowserRouter with
+  server-side fallback config instead
+
+
+STEP 2 — NEW MODULES (add after routing is in place)
+-----------------------------------------------------
+Each module = new route + new component + any new Apps Script actions needed.
+
+(1) Pre-Offer Tracker          /tracker
+    - Log school interest: contacted, visited, offered, committed
+    - Status pipeline per school (kanban-style or table)
+    - Tie to existing short list
+
+(2) Recruiting Scoreboard      /scoreboard
+    - Leaderboard-style view of the athlete's GRIT scores vs. position averages
+    - Show percentile rankings, trend over time as profile is updated
+    - May require storing score history in the DB
+
+(3) Recruiting Events          /events
+    - Calendar/list of camps, combines, showcases
+    - Filter by region, date, division
+    - Link to existing camp URLs from GrittyOS DB (Prospect Camp Link column)
+
+(4) Document Library           /documents
+    - Upload/store: transcripts, highlight film links, letters, physicals
+    - Could use Google Drive API via Apps Script for storage
+    - Display as a list with download/share links
+
+(5) API Connections            /connections
+    - Hudl: link highlight film directly from Hudl account
+    - Twitter/X: connect handle for auto-pull of recruiting tweet activity
+    - Future: On3, 247Sports, Rivals profile links
+
+(6) Coaches View               /coaches
+    - Separate login role: "coach" vs "athlete"
+    - Dropdown to switch between active and graduated athletes from same HS
+    - See all profiles, short lists, scores for their athletes
+    - Requires role field in Auth tab + coach-to-athlete relationship in DB
+    - HUDL IMPORT: allow coaches to bulk-create athlete profiles via two paths:
+        Option A — CSV drop-in:
+          - Coach downloads athlete roster/profile export from Hudl
+          - Drops CSV file into the app via a drag-and-drop or file picker UI
+          - App parses CSV, maps Hudl columns to our DB fields (name, position,
+            grad year, height, weight, HS, email, Hudl profile URL, etc.)
+          - Coach reviews a preview table, edits any mismatches, then confirms
+          - Bulk saveRecruit calls create accounts for each athlete in the DB
+          - Athletes receive setup email to create their own password
+        Option B — Hudl API (if API access is available):
+          - Coach authenticates via Hudl OAuth from within the app
+          - App pulls team roster directly from Hudl API
+          - Same preview/confirm/bulk-create flow as CSV path
+          - Hudl highlight film URL auto-populated in each athlete's profile
+        Notes:
+          - Hudl's public API access is limited; CSV path is the reliable fallback
+          - Column mapping may need a manual-override UI if Hudl changes export format
+          - Duplicate detection needed: check existing email/SAID before creating
+
+
+STEP 3 — DOMAIN + PRODUCTION DEPLOYMENT
+-----------------------------------------
+Move off GitHub Pages to a real domain and production-grade hosting.
+This is the most important step for making it a real CRM product.
+
+Tasks:
+  a) Register a domain (e.g. gritfit.app, recruitgrit.com, etc.)
+  b) Choose hosting — options:
+       - Vercel or Netlify: easiest, free tier, handles SPA routing natively,
+         supports custom domains + SSL, CI/CD on git push
+       - Cloudflare Pages: similar, excellent CDN, very fast
+       - AWS Amplify / GCP Firebase Hosting: more control, more setup
+     Recommendation: Vercel or Netlify to start — zero config, instant deploys
+  c) Point DNS to host, configure SSL (auto on Vercel/Netlify)
+  d) Move VITE_API_BASE and any secrets to host's environment variable settings
+     (not in .env committed to repo)
+  e) Consider migrating backend off Apps Script to a proper API as scale grows:
+       - Apps Script has rate limits (20k requests/day on free Workspace)
+       - Options: Supabase (Postgres + auth), PlanetScale, Firebase, or a
+         lightweight Node/Express API on Railway or Fly.io
+  f) Mobile: once on a real domain, wrap in a PWA (Progressive Web App)
+       - Add manifest.json + service worker → "Add to Home Screen" on iOS/Android
+       - No App Store submission required for initial mobile support
+       - True native app (React Native or Capacitor) is a later-stage option
+
+
+CURRENT TECH STACK (reference)
+--------------------------------
+Frontend : React + Vite, Leaflet + leaflet.markercluster
+Backend  : Google Apps Script Web App (Code.gs)
+Database : Google Sheets (GrittyOS DB — Sheet ID in Code.gs)
+Auth     : Custom session tokens stored in Auth tab
+Hosting  : GitHub Pages (gh-pages branch)
+Deploy   : npm run build && npx gh-pages -d dist (frontend)
+           Apps Script manual redeploy in editor (backend)

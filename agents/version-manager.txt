@@ -1,0 +1,58 @@
+CFB RECRUIT HUB — AGENT: version-manager
+=========================================
+Definition file: C:\Users\chris\chris-miniverse\.claude\agents\version-manager.md
+Agent memory:    C:\Users\chris\chris-miniverse\.claude\agent-memory\version-manager\
+Scope:           GLOBAL — works across all repos
+
+
+COMMANDS — HOW TO USE THIS AGENT
+---------------------------------
+
+Launch a version check (ask Claude):
+  "run the version manager on cfb-recruit-hub"
+  "version the announce repo"
+  "cut a release for CFB-mapping"
+  "what version are we on for cfb-recruit-hub?"
+  "ready to tag a new version"
+
+After the agent proposes a version:
+  "yes"              → tag and push as proposed
+  "patch"            → override to patch bump, re-propose
+  "minor"            → override to minor bump, re-propose
+  "major"            → override to major bump, re-propose (always asks twice)
+  "cancel"           → abort, nothing changes
+
+
+KNOWN REPOS (no path needed — just say the alias)
+--------------------------------------------------
+  cfb-recruit-hub    C:\Users\chris\dev\cfb-recruit-hub
+  CFB-mapping        C:\Users\chris\dev\CFB-mapping
+  announce           C:\Users\chris\dev\announce
+  gritos-quicklist   C:\Users\chris\dev\gritos-quicklist
+  chris-miniverse    C:\Users\chris\chris-miniverse
+
+
+SEMVER RULES (how the agent decides the bump)
+---------------------------------------------
+  MAJOR (x.0.0)  Breaking changes, schema rewrites, API contract changes
+  MINOR (x.y.0)  New features, new modules, new endpoints — backwards-compatible
+  PATCH (x.y.z)  Bug fixes, copy/style changes, config updates, docs
+  When in doubt → patch. Never bumps major without your explicit confirmation.
+
+
+SAFETY RULES
+------------
+- Never tags without your "yes"
+- Never force-pushes or overwrites existing tags
+- Warns if there are uncommitted changes before tagging
+- Always tags HEAD — never a historical commit unless you specify
+
+
+WHAT IT OUTPUTS BEFORE YOU CONFIRM
+------------------------------------
+  CURRENT VERSION:  [last tag or "none — first release"]
+  PROPOSED VERSION: [new semver]
+  BUMP TYPE:        patch | minor | major
+  REASON:           [1-2 sentences]
+  CHANGELOG ENTRY:  [bullet list of changes]
+  FILES CHANGED:    [count and key areas]
