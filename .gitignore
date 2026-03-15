@@ -28,3 +28,6 @@ dist-ssr
 # Playwright
 playwright-report/
 test-results/
+
+# clasp pull artifacts (duplicate of Code.gs)
+apps-script/HubScript.js

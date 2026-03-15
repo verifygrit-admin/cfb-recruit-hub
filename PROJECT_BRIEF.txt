@@ -1,0 +1,317 @@
+CFB RECRUIT HUB — PROJECT BRIEF
+GrittyOS / VerfyGrit
+Last Updated: March 2026
+TPM: Chris Conroy
+Status: Active — Pre-Stage 2 Planning
+
+================================================================
+MISSION STATEMENT
+================================================================
+
+Build a multiuser college football recruiting intelligence
+platform that serves student-athletes and families, high school
+coaches, and college football coaches — giving each a
+personalized, data-driven view of the recruiting landscape built
+around the GrittyOS Platinum Opportunity thesis: that selective
+academic institutions with partial or no athletic scholarships
+frequently deliver better long-term career and financial outcomes
+than the conventional D1 scholarship pursuit.
+
+The platform automates what currently exists as per-athlete
+Google Sheets workbooks and makes those modules accessible,
+persistent, and interactive for thousands of simultaneous users,
+each with a SAID-linked profile and recruiting journey.
+
+================================================================
+WHAT WE ARE BUILDING
+================================================================
+
+A role-based web platform with the following user types:
+
+USER TYPE 1 — STUDENT-ATHLETE AND FAMILY
+Primary user. Submits a profile, receives a personalized GRIT
+FIT Formula match list, and manages their full recruiting
+journey through six modules:
+
+  Module 1 — Target List (GRIT FIT results, top 50 matches)
+  Module 2 — Short List (filtered working list from Target List)
+  Module 3 — Admissions Tracker (application status per school)
+  Module 4 — Pre-Offer Tracking (coach contact and film log)
+  Module 5 — Financial Aid Tracker (aid status per school)
+  Module 6 — Recruiting Scoreboard (Quality Offer Score by school)
+  Module 7 — Target Recruiting Events (Jr Days, camps, visits)
+  Module 8 — Document Depository (secure upload and access)
+
+USER TYPE 2 — HIGH SCHOOL COACH
+Roster-level view. Manages multiple athlete profiles linked to
+their school. Surfaces recruiting phase status, engagement
+activity, and alerts across their full player roster. Currently
+being developed as a standalone module (hs-fbcoach-dash repo)
+and will be merged into the main platform as a role-based view.
+
+USER TYPE 3 — COLLEGE FOOTBALL COACH
+Program-level view. Filters athlete profiles by division tier,
+geographic reach radius, and academic admissions threshold.
+Never exposes athlete PII without explicit consent. Receives
+alerts when new athletes in their reach and tier submit profiles.
+
+================================================================
+CORE DATA AND FORMULA ASSETS
+================================================================
+
+GRIT FIT FORMULA
+Three sequential gates that filter and rank all 661 NCAA
+football programs against an athlete's profile:
+
+  Gate 1 — Athletic Tier Match (normal distribution scoring
+            against division median standards, award bonuses)
+  Gate 2 — Recruit Reach (Haversine distance vs tier radius)
+  Gate 3 — Academic Fit (Academic Rigor Score vs school threshold)
+
+Top 50 results ranked by academic rigor fit. Match tiers:
+  Rank 1-30: Top Match (green)
+  Rank 31-40: Good Match (gold)
+  Rank 41-50: Borderline (red)
+
+SAID SYSTEM
+Every athlete profile is assigned a unique Student-Athlete ID:
+Format: GRIT-[GradYear]-[NNNN]
+SAIDs are permanent, non-colliding, and link all modules,
+documents, and records for that athlete.
+
+GRITTYOS MASTER DB
+661 NCAA football programs. Key fields per school:
+UNITID, division, conference, coordinates, COA, admission rate,
+graduation rate, ADLTV, ADLTV Rank, merit aid, recruiting
+questionnaire URL, selectivity tier, athletic standards by
+position and division.
+
+ADLTV — Adjusted Degree Lifetime Value
+ADLTV = DLTV x Graduation Rate
+GrittyOS proprietary metric. Core engine of the Platinum
+Opportunity thesis.
+
+DROI — Degree Return on Investment
+DROI = ADLTV / Net Cost (4-year)
+Primary financial signal for evaluating program value.
+
+QUALITY OFFER SCORE
+Count of YES values across 8 boolean contact/engagement fields
+divided by 8, expressed as a percentage. Drives Scoreboard
+ranking per school per athlete.
+
+================================================================
+WHAT WE ARE NOT BUILDING
+================================================================
+
+This platform is explicitly NOT:
+
+  - A recruiting service or talent evaluation service
+  - A scouting service or film evaluation service
+  - A communication facilitation tool between athletes and coaches
+    (communications are drafted and presented, never sent on behalf)
+  - A social network or athlete profile marketplace
+  - A service that connects athletes to agents or NIL advisors
+
+These exclusions are permanent and non-negotiable. They are not
+backlog items.
+
+================================================================
+CURRENT TECH STACK
+================================================================
+
+Frontend:      React + Vite
+Map:           Leaflet + leaflet.markercluster
+Backend:       Google Apps Script Web App
+Database:      Google Sheets (GrittyOS Master DB)
+Deployment:    GitHub Pages
+Repo (main):   github.com/verifygrit-admin/cfb-recruit-hub
+Repo (coach):  github.com/verifygrit-admin/hs-fbcoach-dash
+
+================================================================
+WHAT HAS BEEN BUILT — STAGE 1 FOUNDATION SUMMARY
+================================================================
+
+COMPLETE AND STABLE
+  - React/Vite frontend with Leaflet map (661 programs)
+  - Division tier color-coded markers with filter system
+  - School detail cards with full data fields
+  - GRIT FIT Formula (all three gates, ranking, match tiers)
+  - SAID generation and profile submission via Apps Script
+  - Recruits tab auto-creation on first submission
+  - Profile insert and update operations
+  - Score dashboard (Athletic Score, Academic Rigor, Test Optional)
+  - Financial data layer (EFC, Net Cost, DROI, Break-Even, ADLTV)
+  - Recruiting questionnaire URLs embedded in school cards
+  - gate-check.mjs and pos-check.mjs validation scripts
+  - GitHub Pages deployment pipeline
+
+IN PROGRESS / PARTIAL
+  - HS Coach Dashboard (standalone repo, not yet merged)
+  - Recruiting Scoreboard module (complete in Sheets, not yet
+    implemented as platform feature)
+  - Target Recruiting Events module (complete in Sheets, not yet
+    implemented as platform feature)
+  - Pre-Offer Tracking module (complete in Sheets, not yet
+    implemented as platform feature)
+
+NOT YET STARTED
+  - Admissions Tracker module
+  - Financial Aid Tracker module
+  - Document Depository
+  - Role-based authentication and user management
+  - College Coach view
+  - Automated agent layer
+
+================================================================
+OPEN ARCHITECTURE DECISION — MUST RESOLVE BEFORE STAGE 2
+================================================================
+
+DECISION REQUIRED: Backend service layer
+
+CONTEXT: Google Apps Script is the current backend. It handles
+school data reads and athlete profile writes adequately at MVP
+scale. However three upcoming requirements exceed its capability:
+
+  1. Role-based authentication (three user types with different
+     data access permissions)
+  2. Document Depository (file storage with per-SAID access
+     isolation and compliance-grade security)
+  3. Autonomous agent triggers (scheduled and event-driven
+     processes that run without a user session)
+
+OPTIONS UNDER CONSIDERATION:
+  A. Extend Apps Script with Google Drive for document storage
+     and handle auth via Google Sign-In. Low complexity, limited
+     scale ceiling, acceptable for MVP.
+  B. Migrate orchestration to Supabase (Postgres + Auth +
+     Storage). Higher capability, proper auth, scales to
+     thousands of users, more build complexity.
+  C. Hybrid: Apps Script handles Sheets I/O, external service
+     handles auth, storage, and agent orchestration.
+
+DECISION OWNER: Chris Conroy
+DECISION DEADLINE: Before any Stage 2 code is written
+STATUS: Open
+
+================================================================
+DOCUMENT DEPOSITORY — TWO STAGE PLAN
+================================================================
+
+MVP (Google Drive backed)
+  - Each SAID gets a dedicated Google Drive folder created
+    automatically on profile submission
+  - Folder shared only with athlete email and parent email —
+    no other access
+  - Platform surfaces clean upload/access UI — families never
+    navigate Drive directly
+  - Document categories: recruiting film, transcripts, test
+    scores, financial aid forms, offer letters
+  - Apps Script manages folder creation, permissions, and
+    document categorization
+  - Audit log of uploads and access maintained in Master DB
+  - Compliance basis: Google Workspace (FERPA-compliant,
+    SOC 2 certified, encrypted at rest and in transit)
+
+SCALE (planned migration, not yet built)
+  - Migrate storage layer to Supabase Storage or equivalent
+    when Drive folder management becomes unworkable at volume
+  - Front-end UI does not change — storage layer swaps behind it
+  - Trigger: user volume or operational friction, not a date
+
+================================================================
+AGENT TEAM — PLANNED
+================================================================
+
+The following agents are planned. None are built yet. Build
+order follows platform stage completion.
+
+  1. Code Monitor          — auth, API, SAID integrity, collisions
+  2. Profile Agent         — SAID lifecycle, deduplication, state
+  3. Scoreboard Agent      — Quality Offer Score, engagement tracking
+  4. Events Agent          — calendar monitoring, alerts, outcomes
+  5. Coach Dashboard Agent — roster aggregation, HS coach view
+  6. Communications Agent  — template surfacing, outreach logging
+  7. Financial Aid Agent   — EFC validation, cost recalculation
+  8. Data Steward          — Master DB integrity, link rot, IPEDS sync
+  9. College Coach Agent   — program-side athlete matching
+  10. Orchestrator         — routing, conflict prevention, system log
+
+Each agent will have a dedicated system prompt written in
+business and data language. Claude Code provides coding
+capability. Agent system prompts provide domain context,
+jurisdiction, business logic, and authority boundaries.
+
+================================================================
+BACKLOG — NOT IN CURRENT SCOPE
+================================================================
+
+  - NIL tracking or advisory features
+  - Transfer portal integration
+  - Direct messaging between any user types
+  - Public athlete profile pages
+  - Native mobile app
+  - Supabase migration (planned but not scheduled)
+  - Agent autonomous trigger layer (planned, post-MVP modules)
+
+================================================================
+ACCEPTANCE CRITERIA — FULL PLATFORM MVP
+================================================================
+
+The platform MVP is complete when:
+
+  1. All three user types can log in with role-appropriate access
+  2. A student-athlete can submit a profile and receive GRIT FIT
+     results within the same session
+  3. All six athlete modules are accessible and data-persistent
+     per SAID across sessions
+  4. A HS coach can view a roster-level dashboard of their
+     linked athletes
+  5. A college coach can filter athlete profiles by tier,
+     reach, and academic threshold with PII protected
+  6. Documents can be uploaded, categorized, and accessed
+     securely per SAID with no cross-athlete exposure
+  7. The platform handles simultaneous multiuser sessions
+     without data collision or SAID duplication
+  8. All financial calculations (EFC, Net Cost, DROI,
+     Break-Even, ADLTV) produce results consistent with
+     the GrittyOS Master DB formula sheet
+
+================================================================
+DECISION LOG
+================================================================
+
+DECISION 001
+Date: March 2026
+What: Document Depository MVP will use Google Drive as storage
+      layer with Apps Script managing folder creation and
+      permissions per SAID
+Why: Google Workspace meets compliance baseline (FERPA, SOC 2,
+     encrypted at rest and in transit). Avoids premature
+     infrastructure complexity at current user scale.
+Alternatives rejected: Supabase Storage (correct long-term
+     answer but over-engineered for MVP user volume)
+Migration trigger: User volume or operational friction makes
+     Drive folder management unworkable
+
+DECISION 002
+Date: March 2026
+What: HS Coach Dashboard will be merged into main platform
+      as a role-based view, not maintained as a separate repo
+Why: Single codebase reduces maintenance burden and enables
+     shared authentication layer
+Alternatives rejected: Maintaining hs-fbcoach-dash as
+     standalone (creates divergence risk as platform evolves)
+
+================================================================
+SESSION LOG
+================================================================
+
+Session 001 — March 2026
+Completed: Project Brief drafted. Automation Architecture
+drafted. Architecture audit prompt prepared for Claude Code.
+Open: Backend architecture decision (Decision 002 pending).
+Next: Run architecture audit in Claude Code. Return results
+here for Stage 2 planning.
+
+================================================================
