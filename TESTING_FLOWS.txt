@@ -159,12 +159,23 @@ Notes: Fixed prior to test session. Sync effect was firing before auth confirmed
   [ ] Short list saves and restores (Flow 6)
 
 
+── v1.1.1 DEPLOY STEPS (fix/v1.1.1-recruits-schema) ─────────────────────────
+After merging and redeploying Code.gs in Apps Script editor:
+  1. Open Apps Script editor → Run repairRecruitsHeaders() ONCE manually
+  2. Verify Recruits!A1:AC1 headers via gws CLI:
+     gws sheets +read --spreadsheet 1Pc4LOnD1fhQz-9pI_CUEDaAMDfTkUXcCRTVDfoDWvqo --range "Recruits!A1:AC1" --format table
+  3. Confirm cols 24/25/26 = status/pendingToken/pendingTokenExpiry
+  4. Confirm cols 27/28/29 = lastLogin/lastLogout/loginCount
+  5. Run regression checks below before marking flows tested
+
+
 ── NOTES ─────────────────────────────────────────────────────────────────────
 Apps Script sheet structure (Recruits tab):
   Cols 1-23:  Profile data (SAID, timestamp, name ... allState)
   Col 24:     status ("pending" → "active")
   Col 25:     pendingToken
   Col 26:     pendingTokenExpiry
+  Cols 27-29: lastLogin, lastLogout, loginCount (moved from 24-26 in v1.1.1)
 
 Apps Script sheet structure (Auth tab):
   Cols 1-12:  SAID, email, passwordHash, salt, sessionToken, tokenExpiry,
