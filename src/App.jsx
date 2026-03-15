@@ -10,7 +10,7 @@ import HelmetAnim from "./components/HelmetAnim.jsx";
 import StayGrittyModal from "./components/StayGrittyModal.jsx";
 import AuthModal from "./components/AuthModal.jsx";
 import SettingsPage from "./components/SettingsPage.jsx";
-import { fetchSchools, fetchTracker, saveRecruit, updateRecruit, geocodeHighSchool, saveShortList, getShortList, validateToken, signOut, completePendingAccount, confirmEmailChangeMagicLink, checkEmail } from "./lib/api.js";
+import { fetchSchools, fetchTracker, saveRecruit, updateRecruit, geocodeHighSchool, saveShortList, getShortList, validateToken, signOut, completePendingAccount, confirmEmailChangeMagicLink, checkEmail, resendSetupEmail } from "./lib/api.js";
 import { runQuickList, getClassLabel } from "./lib/scoring.js";
 import grittyOsLogo from "./assets/grittyos-logo.png";
 
@@ -487,6 +487,25 @@ export default function App() {
     localStorage.removeItem("cfb_said");
   }
 
+  function handleStartOver() {
+    setSaid(null);
+    setSavedIdentity(null);
+    setAthlete(BLANK_ATHLETE);
+    setResults(null);
+    localStorage.removeItem("cfb_said");
+  }
+
+  async function handleResendSetup() {
+    if (!savedIdentity?.email) return;
+    try {
+      await resendSetupEmail(savedIdentity.email);
+      setError(null);
+      setGritFitPrompt(`Setup email resent to ${savedIdentity.email}. Check your inbox (and spam) for the link.`);
+    } catch {
+      setGritFitPrompt("Failed to resend — please try again or contact verifygrit@gmail.com.");
+    }
+  }
+
   async function handleSubmit(forceNew = false) {
     setError(null);
     setGritFitPrompt(null);
@@ -559,7 +578,11 @@ export default function App() {
         // Unauthenticated — check if email already has an account before creating a new SAID
         const emailCheck = await checkEmail(athlete.email).catch(() => ({ hasAccount: false }));
         if (emailCheck.hasAccount) {
-          setGritFitPrompt(`An account already exists for ${athlete.email}. Sign in to update your profile and view your results.`);
+          if (emailCheck.pendingAccount) {
+            setGritFitPrompt(`A profile for ${athlete.email} is pending account setup. Check your email for the setup link, or use the form below to resend it.`);
+          } else {
+            setGritFitPrompt(`An account already exists for ${athlete.email}. Sign in to update your profile and view your results.`);
+          }
           setAuthModalView("signIn");
           setShowAuthModal(true);
           return;
@@ -862,6 +885,9 @@ export default function App() {
                   auth={auth}
                   onSignIn={() => { setAuthModalView("signIn"); setShowAuthModal(true); }}
                   prompt={gritFitPrompt}
+                  pendingCompletion={!!said && !auth && !!savedIdentity}
+                  onResendSetup={handleResendSetup}
+                  onStartOver={handleStartOver}
                 />
               </div>
             )

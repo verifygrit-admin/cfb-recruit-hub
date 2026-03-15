@@ -118,7 +118,19 @@ function checkEmail(email) {
   if (!email) return { hasAccount: false };
   const sheet = getOrCreateAuthSheet();
   const row = findAuthRow(sheet, 2, email);
-  return { hasAccount: row > 0 };
+  if (row > 0) return { hasAccount: true };
+  // Also check Recruits tab for pending (unactivated) accounts
+  const ss = SpreadsheetApp.openById(GRITTY_DB_SHEET_ID);
+  const recruitSheet = ss.getSheetByName(RECRUITS_TAB_NAME);
+  if (recruitSheet && recruitSheet.getLastRow() > 1) {
+    const data = recruitSheet.getRange(2, 1, recruitSheet.getLastRow() - 1, 24).getValues();
+    for (const r of data) {
+      if (String(r[6]).trim().toLowerCase() === email.toLowerCase() && String(r[23]).trim() === "pending") {
+        return { hasAccount: true, pendingAccount: true };
+      }
+    }
+  }
+  return { hasAccount: false };
 }
 
 function saveRecruit(profile) {

@@ -38,7 +38,7 @@ const AWARD_OPTIONS = [
   { key: "allState",        label: "All-State" },
 ];
 
-export default function QuickListForm({ athlete, onChange, onAwardChange, onSubmit, onNewProfile, loading, error, geocoding, hasSaid, auth, onSignIn, prompt }) {
+export default function QuickListForm({ athlete, onChange, onAwardChange, onSubmit, onNewProfile, loading, error, geocoding, hasSaid, auth, onSignIn, prompt, pendingCompletion, onResendSetup, onStartOver }) {
   const set = (key, val) => onChange(key, val);
   const [activeInfo, setActiveInfo] = useState(null);
 
@@ -89,19 +89,19 @@ export default function QuickListForm({ athlete, onChange, onAwardChange, onSubm
                   )}
                 </label>
                 {f.type === "select"
-                  ? <select value={athlete[f.key]} onChange={e => set(f.key, e.target.value)}>
+                  ? <select value={athlete[f.key]} onChange={e => set(f.key, e.target.value)} disabled={pendingCompletion}>
                       <option value="" disabled>Select Primary Recruited Position</option>
                       {f.options.map(o => <option key={o} value={o}>{o}</option>)}
                     </select>
                   : f.type === "gradYear"
-                  ? <select value={athlete[f.key]} onChange={e => set(f.key, e.target.value)}>
+                  ? <select value={athlete[f.key]} onChange={e => set(f.key, e.target.value)} disabled={pendingCompletion}>
                       <option value="" disabled>Select Graduation Year</option>
                       {Array.from({ length: 11 }, (_, i) => new Date().getFullYear() + i).map(y => (
                         <option key={y} value={y}>{y}</option>
                       ))}
                     </select>
                   : f.type === "dependents"
-                  ? <select value={athlete[f.key]} onChange={e => set(f.key, e.target.value)}>
+                  ? <select value={athlete[f.key]} onChange={e => set(f.key, e.target.value)} disabled={pendingCompletion}>
                       <option value="" disabled>Select</option>
                       <option value="1">1</option>
                       <option value="2">2</option>
@@ -115,12 +115,14 @@ export default function QuickListForm({ athlete, onChange, onAwardChange, onSubm
                       inputMode="numeric"
                       value={athlete[f.key] ? "$" + parseInt(String(athlete[f.key]).replace(/[^0-9]/g, "") || "0").toLocaleString() : ""}
                       placeholder={f.ph}
+                      readOnly={pendingCompletion}
                       onChange={e => {
                         const raw = e.target.value.replace(/[^0-9]/g, "");
                         set(f.key, raw);
                       }}
                     />
                   : <input type={f.type} value={athlete[f.key]} placeholder={f.ph}
+                      readOnly={pendingCompletion}
                       onChange={e => set(f.key, e.target.value)} />
                 }
               </div>
@@ -163,6 +165,7 @@ export default function QuickListForm({ athlete, onChange, onAwardChange, onSubm
           {AWARD_OPTIONS.map(a => (
             <label key={a.key} className="award-label" style={{ color: athlete.awards[a.key] ? "var(--accent)" : "var(--muted)" }}>
               <input type="checkbox" checked={athlete.awards[a.key]}
+                disabled={pendingCompletion}
                 onChange={e => onAwardChange(a.key, e.target.checked)} />
               {a.label}
             </label>
@@ -170,21 +173,37 @@ export default function QuickListForm({ athlete, onChange, onAwardChange, onSubm
         </div>
       </div>
 
-      <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-        <button className="form-submit" onClick={() => onSubmit(false)} disabled={loading} style={{ flex: 1 }}>
-          {loading ? "Running GRIT FIT Formula…" : hasSaid ? "Update My GRIT Fit →" : "Generate My GRIT Fit →"}
-        </button>
-        {hasSaid && (
-          <button
-            className="form-submit"
-            onClick={onNewProfile}
-            disabled={loading}
-            style={{ flex: "0 0 auto", background: "#1a2e1d", borderColor: "#6b8c72", color: "#6b8c72" }}
-          >
-            Submit New Profile
+      {pendingCompletion ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <button className="form-submit" onClick={onResendSetup} disabled={loading} style={{ flex: 1 }}>
+            Resend Setup Email →
           </button>
-        )}
-      </div>
+          <div style={{ textAlign: "center" }}>
+            <button
+              onClick={onStartOver}
+              style={{ background: "none", border: "none", color: "var(--muted)", fontSize: 13, cursor: "pointer", textDecoration: "underline" }}
+            >
+              Wrong email or want to start over?
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+          <button className="form-submit" onClick={() => onSubmit(false)} disabled={loading} style={{ flex: 1 }}>
+            {loading ? "Running GRIT FIT Formula…" : hasSaid ? "Update My GRIT Fit →" : "Generate My GRIT Fit →"}
+          </button>
+          {hasSaid && (
+            <button
+              className="form-submit"
+              onClick={onNewProfile}
+              disabled={loading}
+              style={{ flex: "0 0 auto", background: "#1a2e1d", borderColor: "#6b8c72", color: "#6b8c72" }}
+            >
+              Submit New Profile
+            </button>
+          )}
+        </div>
+      )}
     </div>
     </div>
   );
