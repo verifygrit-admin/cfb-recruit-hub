@@ -16,7 +16,8 @@ COMPLETION PROTOCOL (DEC-GLOBAL-005, 2026-03-16)
 CURRENT STATE (as of 2026-03-22)
   Flow 6:   [x] DONE — fixed commit 25373d9; verified working
   Flow 1:   [x] DONE — bug found and fixed (commit 52f0e4e); verified working
-  Flows 2-5: [ ] Pending execution against live platform (BL-002)
+  Flow 2:   [x] DONE — spec rewritten, UX fixes applied (commits 78c7737, 5ebed98, 130a271); verified working
+  Flows 3-5: [ ] Pending execution against live platform (BL-002)
 
 
 ── FLOW 1: Submit New Profile While Logged In (Different Email) ──────────────
@@ -106,8 +107,17 @@ Pass criteria:
     confirming pendingToken prop was passed to AuthModal
   - Email field in modal is pre-filled and read-only (greyed out, not editable)
 
-Status: [ ]
-Notes:
+Status: [x]
+Notes: 2026-03-22 — Passed after spec rewrite and UX fixes. Three issues
+       found and resolved: (1) spec missing AuthModal dismiss step —
+       createAccount exhausts pendingToken before magic link can be used;
+       (2) email param omitted from Option B URL — field blank in modal,
+       fixed in spec; (3) pending state UX — fields not visually locked,
+       actions buried at bottom, email error shown in red — fixed with
+       green status banner at top, greyed fields, suppressed error.
+       Core magic link path (completePendingAccount) verified working.
+       Email field pre-filled read-only confirmed. MailApp delivery to
+       Google Workspace unconfirmed — Option B used for testing.
 
 
 ── FLOW 3: Edit My Profile — Email Change ────────────────────────────────────
