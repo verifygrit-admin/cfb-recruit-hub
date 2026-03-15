@@ -41,6 +41,19 @@ BL-003 | 2026-03-16 | Sage (prescience assessment) | LOW | Open
   Files: src/components/QuickListForm.jsx, src/components/SettingsPage.jsx
   Note: Do NOT touch until Chris explicitly reopens this item.
 
+BL-004 | 2026-03-22 | Dexter (Gate 0/1 audit) | LOW | Open
+  Auth tab cols 13-15 missing header labels on sheet creation.
+  getOrCreateAuthSheet() in Code.gs only writes header labels for
+  cols 1-12. Cols 13-15 (pendingNewEmail/emailVerifyCode/emailVerifyExpiry)
+  are read/written correctly at runtime by requestEmailChangeMagicLink
+  and confirmEmailChangeMagicLink, but if the Auth sheet is ever
+  recreated from scratch, those column headers will be blank.
+  Not a runtime blocker. Tidy-up item.
+  File: apps-script/Code.gs (getOrCreateAuthSheet function)
+  Flagged during: Gate 0/1 audit, Sunday 2026-03-22 session
+  Suggested action: Add cols 13-15 header labels to getOrCreateAuthSheet().
+  Do NOT touch until explicitly scheduled — no impact on live platform.
+
 ================================================================
 
 INSTRUCTIONS FOR SCRIBE
