@@ -432,7 +432,8 @@ function createAccount(payload) {
   logAuth(said, email, "account_created", userAgent);
   updateRecruitAuthFields(said, "login");
   markRecruitActive(said);
-  return { ok: true, sessionToken, tokenExpiry, said, email };
+  const profile = getProfileBySAID(said);
+  return { ok: true, sessionToken, tokenExpiry, said, email, profile };
 }
 
 function signIn(payload) {
