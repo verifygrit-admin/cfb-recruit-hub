@@ -192,7 +192,9 @@ OPTIONS UNDER CONSIDERATION:
 
 DECISION OWNER: Chris Conroy
 DECISION DEADLINE: Before any Stage 2 code is written
-STATUS: Open
+STATUS: Made — Option B (Supabase) confirmed 2026-03-15
+        Supabase account provisioned + linked to GitHub (2026-03-16)
+        See DEC-CFB-001 for full decision record
 
 ================================================================
 DOCUMENT DEPOSITORY — TWO STAGE PLAN

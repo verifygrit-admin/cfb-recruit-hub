@@ -5,6 +5,22 @@ Live app: https://verifygrit-admin.github.io/cfb-recruit-hub/
 
 STATUS KEY:  [ ] Not tested  [x] Passed  [!] Bug found  [-] Skipped
 
+COMPLETION PROTOCOL (DEC-GLOBAL-005, 2026-03-16)
+  When a flow is tested, the agent running the test MUST:
+  1. Update the Status line with [x], [!], or [-]
+  2. Add date and brief notes to the Notes field
+  3. Log completion in session retro (Scribe files)
+  4. Report to Scout before session closes
+  Unlogged test completions are treated as incomplete.
+
+CURRENT STATE (as of 2026-03-16)
+  Flow 6:   [x] DONE — fixed commit 25373d9; verified working
+  Flows 1-5: [ ] Code was written and fixed across v1.1.1–v1.1.3.
+               Test RUNS have never been executed against the live
+               platform. These are not new flows — they have been
+               pending execution since v1.1.3 deployed.
+               Assigned: run before Stage 2 begins (BL-002)
+
 
 ── FLOW 1: Submit New Profile While Logged In (Different Email) ──────────────
 Goal: Logged-in user submits GRIT Fit form with an email that differs from
