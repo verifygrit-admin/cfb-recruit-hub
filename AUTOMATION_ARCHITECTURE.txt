@@ -1,0 +1,322 @@
+CFB RECRUIT HUB — AUTOMATION ARCHITECTURE
+GrittyOS / VerifyGrit
+Last Updated: March 2026
+TPM: Chris Conroy
+Status: Decision Pending — Do Not Build Until Resolved
+
+================================================================
+PURPOSE OF THIS DOCUMENT
+================================================================
+
+This document records the backend architecture decision that
+must be made before any Stage 2 code is written. It defines
+where automation logic will live, what constraints govern that
+choice, and what the migration path looks like as the platform
+scales.
+
+No agent scripts, service logic, or automated triggers are to
+be built until the decision in this document is finalized and
+recorded.
+
+================================================================
+THE CORE DECISION
+================================================================
+
+QUESTION: Where does automation logic live as we move beyond
+the current Google Apps Script MVP backend?
+
+WHAT TRIGGERED THIS DECISION
+Three Stage 2 requirements exceed Apps Script capability:
+
+  1. ROLE-BASED AUTHENTICATION
+     Three user types (athlete/family, HS coach, college coach)
+     require genuine infrastructure-level access control, not
+     UI-level hiding. Apps Script has no native auth layer.
+
+  2. DOCUMENT DEPOSITORY
+     Secure per-SAID file storage with compliance-grade access
+     isolation requires a proper storage service. Apps Script
+     cannot enforce this at scale.
+
+  3. AUTONOMOUS AGENT TRIGGERS
+     Scheduled and event-driven processes that run without an
+     active user session (daily calendar scans, cold school
+     alerts, stale profile notifications) require persistent
+     background processes. Apps Script time-based triggers are
+     fragile and limited.
+
+================================================================
+OPTIONS UNDER CONSIDERATION
+================================================================
+
+OPTION A — EXTEND APPS SCRIPT + GOOGLE WORKSPACE
+  What it means:
+    Auth via Google Sign-In (OAuth)
+    Document storage via Google Drive (per-SAID folders)
+    Scheduling via Apps Script time-based triggers
+    All logic stays in Apps Script and Google Sheets
+
+  Strengths:
+    Lowest complexity
+    No new infrastructure to learn or manage
+    Consistent with existing stack
+    Fastest path to multiuser MVP
+    Google Workspace compliance baseline already met
+
+  Weaknesses:
+    Apps Script execution time limits (6 min per execution)
+    No persistent background processes
+    Triggers are fragile and hard to monitor
+    Google Drive folder management breaks down at high volume
+    Not a viable long-term architecture beyond ~500 active users
+
+  Best for: MVP with controlled user growth
+
+
+OPTION B — MIGRATE TO SUPABASE
+  What it means:
+    Supabase Auth (email/password + OAuth)
+    Supabase Postgres replaces Google Sheets as primary DB
+    Supabase Storage replaces Google Drive for documents
+    Supabase Edge Functions handle agent logic and triggers
+    Apps Script retired or kept only for Sheets data sync
+
+  Strengths:
+    Proper role-based access control at DB level
+    Scales to thousands of users without architectural changes
+    Built-in audit logging and row-level security
+    Storage meets compliance requirements natively
+    Edge Functions support event-driven and scheduled triggers
+    Active open-source ecosystem
+
+  Weaknesses:
+    Significant migration effort from Sheets to Postgres
+    Requires learning new platform
+    Adds cost as usage scales
+    Breaks current Apps Script workflow during transition
+
+  Best for: Platform with serious multiuser ambitions
+            and a defined migration window
+
+
+OPTION C — HYBRID ARCHITECTURE
+  What it means:
+    Apps Script continues handling Google Sheets I/O
+    External lightweight service handles auth, storage, triggers
+    React frontend connects to both layers
+    Services communicate via API calls
+
+  Strengths:
+    Preserves existing Sheets infrastructure and data
+    Adds capability without full migration
+    Can be built incrementally
+    Lower disruption to current working features
+
+  Weaknesses:
+    Two backends to maintain
+    Potential sync issues between Sheets and external service
+    More complex than either pure option
+    Technical debt accumulates if not managed carefully
+
+  Best for: Teams that need to preserve Sheets workflows
+            while adding platform-grade features
+
+
+================================================================
+DECISION
+================================================================
+
+CHOSEN OPTION: B — Migrate to Supabase
+
+REASON: Platform requires role-based auth, document storage, and
+autonomous agent triggers that exceed Apps Script capability.
+Option B is the correct long-term architecture. Migration will be
+executed in Option C (hybrid) transition mode — service by service —
+to avoid user-facing downtime.
+
+CONSTRAINTS THIS DECISION MUST RESPECT:
+  - Must not break existing profile submission and SAID system
+  - Must preserve GRIT FIT Formula integrity and output
+  - Must maintain GrittyOS Master DB as source of truth for
+    school data during MVP phase
+  - Must support Google Drive document storage at MVP before
+    any storage migration
+
+ALTERNATIVES REJECTED AND WHY:
+  Option A — extends the Apps Script ceiling but does not remove it.
+  Every Stage 2 requirement eventually exceeds it. Defers the
+  migration to a point when it becomes harder, not avoidable.
+
+  Option C (permanent) — two backends indefinitely creates sync risk
+  and double maintenance burden. Option C is the transition path to
+  Option B, not a destination.
+
+EXECUTION SEQUENCE:
+  1. Close Stage 1 — resolve v1.1.2 through v1.1.4, Dexter validates
+     v1.1.1, Rio tags the Stage 1 version
+  2. Produce Option B migration spec — Morty audits with migration in
+     mind, Patch documents Sheets schema as Postgres DDL target, spec
+     defines auth migration path and cutover plan
+  3. Migrate to Option B per spec — Option C hybrid transition mode
+     (service by service) to avoid user-facing downtime
+
+DECISION OWNER: Chris Conroy
+DECISION DATE: 2026-03-15
+DECISION STATUS: MADE
+
+================================================================
+WHAT GETS BUILT IN EACH OPTION
+================================================================
+
+STAGE 2 BUILD LIST — COMMON TO ALL OPTIONS
+These get built regardless of which option is chosen:
+
+  - Role-based login and user type routing
+  - HS Coach Dashboard merged into main platform
+  - Recruiting Scoreboard as live platform module
+  - Target Recruiting Events as live platform module
+  - Pre-Offer Tracking as live platform module
+  - Short List as live platform module
+  - Admissions Tracker (new module)
+  - Financial Aid Tracker (new module)
+  - Document Depository MVP (Google Drive backed)
+  - SAID-linked folder creation on profile submission
+
+STAGE 2 BUILD LIST — OPTION A ONLY
+  - Google Sign-In OAuth integration
+  - Apps Script user role management
+  - Time-based trigger setup for agent functions
+  - Drive folder permission management per SAID
+
+STAGE 2 BUILD LIST — OPTION B ONLY
+  - Supabase project setup and schema design
+  - Data migration from Google Sheets to Postgres
+  - Supabase Auth implementation
+  - Row-level security policies per user type
+  - Supabase Storage bucket setup with per-SAID policies
+  - Edge Function scaffolding for agent logic
+
+STAGE 2 BUILD LIST — OPTION C ONLY
+  - External auth service selection and integration
+  - API bridge between Apps Script and external service
+  - Storage service selection and integration
+  - Sync logic between Sheets and external DB
+
+================================================================
+AGENT AUTOMATION — BUILD SEQUENCE
+================================================================
+
+Agents are built after the backend decision is made and the
+corresponding auth and storage infrastructure is in place.
+No agent script is written before its infrastructure dependency
+is resolved.
+
+PHASE 1 — FOUNDATION AGENTS (build first)
+  Code Monitor         Depends on: existing stack, no new infra
+  Profile Agent        Depends on: auth layer, SAID system stable
+  Scoreboard Agent     Depends on: Scoreboard module live
+
+PHASE 2 — ENGAGEMENT AGENTS
+  Events Agent         Depends on: Events module live, triggers
+  Coach Dashboard      Depends on: HS Coach merge complete
+  Communications Agent Depends on: Pre-Offer module live
+
+PHASE 3 — FINANCIAL AND DATA AGENTS
+  Financial Aid Agent  Depends on: Financial Aid module live
+  Data Steward         Depends on: stable Master DB connection
+  College Coach Agent  Depends on: College Coach view live
+
+PHASE 4 — ORCHESTRATION
+  Orchestrator         Depends on: all Phase 1-3 agents stable
+
+================================================================
+AUTONOMOUS TRIGGER ARCHITECTURE — PLANNED
+================================================================
+
+Once the backend decision is made, the following trigger types
+will be implemented. This is a planning reference, not a build
+spec. Each trigger will get its own spec document before build.
+
+EVENT-DRIVEN TRIGGERS
+  On profile submission     Profile Agent, Document Depository
+  On status field update    Scoreboard Agent
+  On document upload        Document Depository audit log
+  On new athlete in region  College Coach Agent
+
+SCHEDULED TRIGGERS
+  Daily                     Events Agent (calendar scan)
+  Weekly                    Data Steward (link rot check)
+  Every 21 days             Scoreboard Agent (cold school flag)
+  Every 30 days             Profile Agent (stale profile alert)
+
+USER-INITIATED (ON DEMAND)
+  All agents available as on-demand Claude Code sessions
+  before autonomous trigger layer is built
+
+================================================================
+COMPLIANCE AND SECURITY REQUIREMENTS
+================================================================
+
+DOCUMENT STORAGE (ALL OPTIONS)
+  - Encrypted at rest and in transit (Google Workspace baseline)
+  - Per-SAID access isolation — no cross-athlete document access
+  - No shared public URLs for any athlete document
+  - Audit log: who uploaded, who accessed, when
+  - Defined document categories enforced at upload
+  - Data retention policy: [ TO BE DEFINED ]
+  - Deletion policy: [ TO BE DEFINED ]
+
+USER DATA
+  - Athlete PII not exposed to college coaches without
+    explicit consent flag set on athlete profile
+  - Financial data (AGI, EFC) visible only to athlete
+    and linked family/HS coach with athlete permission
+  - SAID is the only identifier used in cross-module references
+
+COMPLIANCE BASELINE
+  Google Workspace: FERPA-compliant, SOC 2 certified
+  Supabase (if chosen): SOC 2 Type 2, encrypted at rest
+  Any chosen option must meet or exceed Google Workspace baseline
+
+================================================================
+MIGRATION PATH — GOOGLE DRIVE TO SCALE STORAGE
+================================================================
+
+TRIGGER FOR MIGRATION
+  User volume or operational friction makes Drive folder
+  management unworkable. Not a date. Not a feature milestone.
+  A pain threshold.
+
+MIGRATION PRINCIPLES
+  - Front-end document UI does not change during migration
+  - Athletes do not lose access to existing documents
+  - All audit logs preserved through migration
+  - Migration happens per SAID in batches, not all at once
+  - Rollback plan defined before migration begins
+
+================================================================
+OPEN QUESTIONS
+================================================================
+
+OQ-001: What is the data retention policy for athlete documents
+        after a student graduates or becomes inactive?
+        Owner: Chris Conroy
+        Status: Open
+
+OQ-002: Will college coaches ever have direct access to athlete
+        documents (e.g. transcripts) or only aggregated data?
+        Owner: Chris Conroy
+        Status: Open
+
+OQ-003: Will the platform charge users? If so, does payment
+        processing affect compliance requirements?
+        Owner: Chris Conroy
+        Status: Open
+
+OQ-004: Will the Admissions Tracker and Financial Aid Tracker
+        remain Google Sheets workbooks at MVP or be built as
+        native platform modules from the start?
+        Owner: Chris Conroy
+        Status: Open
+
+================================================================
