@@ -136,6 +136,7 @@ function saveRecruit(profile) {
       "gpa","sat","hsLat","hsLng","agi","dependents",
       "expectedStarter","captain","allConference","allState",
       "status","pendingToken","pendingTokenExpiry",
+      "lastLogin","lastLogout","loginCount",
     ];
     sheet.appendRow(headers);
   }
@@ -361,18 +362,31 @@ function updateRecruitAuthFields(said, eventType) {
     if (String(data[i][0]) === String(said)) { targetRow = i + 2; break; }
   }
   if (targetRow < 0) return;
-  // Ensure header cols 24/25/26 exist
-  if (!sheet.getRange(1, 24).getValue()) sheet.getRange(1, 24).setValue("lastLogin");
-  if (!sheet.getRange(1, 25).getValue()) sheet.getRange(1, 25).setValue("lastLogout");
-  if (!sheet.getRange(1, 26).getValue()) sheet.getRange(1, 26).setValue("loginCount");
+  // Ensure header cols 27/28/29 exist
+  if (!sheet.getRange(1, 27).getValue()) sheet.getRange(1, 27).setValue("lastLogin");
+  if (!sheet.getRange(1, 28).getValue()) sheet.getRange(1, 28).setValue("lastLogout");
+  if (!sheet.getRange(1, 29).getValue()) sheet.getRange(1, 29).setValue("loginCount");
   const now = new Date().toISOString();
-  const count = parseInt(sheet.getRange(targetRow, 26).getValue() || 0);
+  const count = parseInt(sheet.getRange(targetRow, 29).getValue() || 0);
   if (eventType === "login") {
-    sheet.getRange(targetRow, 24).setValue(now);
-    sheet.getRange(targetRow, 26).setValue(count + 1);
+    sheet.getRange(targetRow, 27).setValue(now);
+    sheet.getRange(targetRow, 29).setValue(count + 1);
   } else {
-    sheet.getRange(targetRow, 25).setValue(now);
+    sheet.getRange(targetRow, 28).setValue(now);
   }
+}
+
+function repairRecruitsHeaders() {
+  const ss = SpreadsheetApp.openById(GRITTY_DB_SHEET_ID);
+  const sheet = ss.getSheetByName(RECRUITS_TAB_NAME);
+  if (!sheet) { Logger.log("Recruits tab not found"); return; }
+  sheet.getRange(1, 24).setValue("status");
+  sheet.getRange(1, 25).setValue("pendingToken");
+  sheet.getRange(1, 26).setValue("pendingTokenExpiry");
+  sheet.getRange(1, 27).setValue("lastLogin");
+  sheet.getRange(1, 28).setValue("lastLogout");
+  sheet.getRange(1, 29).setValue("loginCount");
+  Logger.log("Headers repaired: cols 24-29 corrected.");
 }
 
 function getProfileBySAID(said) {
