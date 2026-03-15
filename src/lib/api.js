@@ -150,20 +150,6 @@ export async function completePendingAccount(said, pendingToken, password) {
   return res.json();
 }
 
-export async function requestEmailChange(said, sessionToken, newEmail) {
-  if (!API_BASE) return { error: "No API configured." };
-  const res = await post("requestEmailChange", { said, sessionToken, newEmail });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return res.json();
-}
-
-export async function confirmEmailChange(said, verifyCode) {
-  if (!API_BASE) return { error: "No API configured." };
-  const res = await post("confirmEmailChange", { said, verifyCode });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return res.json();
-}
-
 export async function requestEmailChangeMagicLink(said, sessionToken, newEmail) {
   if (!API_BASE) return { error: "No API configured." };
   const res = await post("requestEmailChangeMagicLink", { said, sessionToken, newEmail });

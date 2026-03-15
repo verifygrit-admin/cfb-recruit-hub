@@ -1,0 +1,41 @@
+CFB-RECRUIT-HUB — BACKLOG
+=========================
+Maintained by: Scribe (appends items as flagged)
+Reviewed by:   Scout (after every Dexter validation — see backlog review template)
+Format: [ID] | [DATE] | [SOURCE] | [PRIORITY] | [STATUS] | [DESCRIPTION]
+
+Priority levels: HIGH / MEDIUM / LOW / HOUSEKEEPING
+Status: Open / Pulled In / Closed / Deferred
+
+================================================================
+
+BL-001 | 2026-03-16 | Patch (v1.1.4 audit) | HOUSEKEEPING | Closed (v1.1.5 — 2026-03-16)
+  api.js dead exports: requestEmailChange and confirmEmailChange
+  remain as exports in src/lib/api.js (lines ~153-165) but are
+  no longer called from any component post-v1.1.3. These are dead
+  code and should be removed to keep the API surface clean.
+  NOTE: requestEmailChangeMagicLink (lines ~167-172) is NOT dead —
+  SettingsPage.jsx imports and calls it. Scope correction made by
+  Dexter during v1.1.4 validation (2026-03-16). Original flag
+  incorrectly included it as dead.
+  File: src/lib/api.js
+  Flagged during: v1.1.4 audit (out of scope at time of flagging)
+  Scope corrected: Dexter v1.1.4 validation (2026-03-16)
+  Suggested action: Remove only requestEmailChange and
+  confirmEmailChange. Dexter spot-checks before Patch removes.
+
+================================================================
+
+INSTRUCTIONS FOR SCRIBE
+When any agent flags a backlog item during task execution:
+  1. Append to this file using the format above
+  2. Assign the next sequential BL-ID
+  3. Index in MASTER_INDEX under project cfb-recruit-hub
+  4. Log in VAULT_LOG
+
+INSTRUCTIONS FOR SCOUT
+Review this backlog after every Dexter validation using the
+Backlog Review Template at:
+  C:\Users\chris\dev\_org\meetings\working-team\SCOUT_BACKLOG_REVIEW_TEMPLATE.txt
+
+================================================================
