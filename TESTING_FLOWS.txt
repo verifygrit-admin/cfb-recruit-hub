@@ -63,24 +63,45 @@ Notes: 2026-03-22 — Passed after bug fix (commit 52f0e4e). savedAthleteRef/
 
 
 ── FLOW 2: Magic Link Account Completion ─────────────────────────────────────
-Goal: When a new profile is submitted (saveRecruit), an email is sent to the
-      recruit's address with a ?completeSAID=&token= link. Clicking the link
-      opens the app and shows a password-set modal to activate the account.
+Goal: Magic link path activates a PENDING account for a user who did not
+      complete the immediate AuthModal after form submission. This is the
+      fallback for users who closed the modal or came back later. It is NOT
+      the forgot-password flow (that is Flow C / resetPassword). It is NOT
+      the same as the immediate createAccount path tested in Flow 1.
+
+      The magic link is one-time use: if createAccount already ran for the
+      same SAID, completePendingAccount will fail ("account already exists").
+      The AuthModal MUST be dismissed before the link is used.
+
+NOTE: Updated 2026-03-22 — original spec did not require dismissing the
+      AuthModal first. Test design corrected after live testing revealed
+      that immediate createAccount path exhausts the pendingToken.
+      MailApp delivery to Google Workspace confirmed unreliable (silent
+      failure — no error thrown). Use Option B (sheet lookup) for testing.
 
 Steps:
-  1. Submit GRIT Fit form as a logged-OUT user (or use a fresh email)
-  2. Check the submitted email inbox for GrittyOS setup email
-  3. Click the link in the email (format: ...?completeSAID=GRIT-XXXX&token=UUID&email=...)
-  4. Expect: app opens, password modal appears pre-filled with the SAID
-  5. Set password and submit
-  6. Expect: signed in automatically, profile loaded, redirected to results
+  1. Sign out if currently signed in
+  2. Submit GRIT Fit form as a logged-OUT user with a fresh email address
+  3. When the AuthModal appears — DISMISS IT (click X or Cancel)
+     Do NOT create a password. Account must remain in "pending" status.
+  4. Open GrittyOS DB spreadsheet → Recruits tab → find the new row
+  5. Copy the value in col 25 (pendingToken)
+  6. Construct the magic link manually:
+     https://verifygrit-admin.github.io/cfb-recruit-hub/?completeSAID=<SAID>&token=<pendingToken>&email=<encoded-email>
+  7. Paste the link into the browser and navigate to it
+  8. Expect: app opens, password-set modal appears (title: "Complete Your
+     Account Access") pre-filled with the SAID
+  9. Set a password (8+ characters) and submit
+  10. Expect: signed in automatically, profile loaded, redirected to results
 
 Pass criteria:
-  - Link opens app at correct URL
-  - Password modal appears (not sign-in modal)
-  - completePendingAccount API call succeeds
-  - Auth tab row created; Recruits tab status → "active"
+  - completePendingAccount API call succeeds (not createAccount)
+  - Auth tab row created with correct SAID and email
+  - Recruits tab status → "active"; pendingToken and pendingTokenExpiry
+    cleared (cols 25–26 blank after completion)
   - Session established — user is logged in immediately after
+  - Modal title reads "Complete Your Account Access" (not "Create Your Account")
+    confirming pendingToken prop was passed to AuthModal
 
 Status: [ ]
 Notes:
