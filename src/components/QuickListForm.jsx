@@ -49,21 +49,40 @@ export default function QuickListForm({ athlete, onChange, onAwardChange, onSubm
       <h2 className="form-title">Student-Athlete Profile</h2>
       <p className="form-subtitle">Enter your data to generate a personalized map of matching NCAA programs. Distance is estimated from your high school — enter your full high school name to ensure the most accurate recruiting reach results.</p>
 
-      {prompt && (
-        <div className="gritfit-prompt-banner">
-          <div className="gritfit-prompt-icon">🏈</div>
-          <div>{prompt}</div>
+      {pendingCompletion ? (
+        <div style={{ background: '#0e1f10', border: '1px solid #2e6b18', borderRadius: 4, padding: '18px 20px', marginBottom: 24, display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={{ color: '#c8f5a0', fontWeight: 700, fontSize: 15, letterSpacing: 0.3 }}>
+            Profile saved — complete your account setup to access your results.
+          </div>
+          <div style={{ color: '#6b8c72', fontSize: 13, lineHeight: 1.5 }}>
+            Your form data is locked. Resend the setup email to your submitted address, or start over with a different email.
+          </div>
+          <button className="form-submit" onClick={onResendSetup} disabled={loading} style={{ marginTop: 4 }}>
+            Resend Setup Email →
+          </button>
+          <div style={{ textAlign: 'center' }}>
+            <button onClick={onStartOver} style={{ background: 'none', border: 'none', color: 'var(--muted)', fontSize: 13, cursor: 'pointer', textDecoration: 'underline' }}>
+              Wrong email or want to start over?
+            </button>
+          </div>
         </div>
+      ) : (
+        <>
+          {prompt && (
+            <div className="gritfit-prompt-banner">
+              <div className="gritfit-prompt-icon">🏈</div>
+              <div>{prompt}</div>
+            </div>
+          )}
+          {!auth && hasSaid && (
+            <div className="signin-restore-banner">
+              Have a GrittyOS account?{" "}
+              <button onClick={onSignIn}>Sign in to restore your session →</button>
+            </div>
+          )}
+          {error && <div className="form-error">{error}</div>}
+        </>
       )}
-
-      {!auth && hasSaid && (
-        <div className="signin-restore-banner">
-          Have a GrittyOS account?{" "}
-          <button onClick={onSignIn}>Sign in to restore your session →</button>
-        </div>
-      )}
-
-      {error && <div className="form-error">{error}</div>}
 
       {FORM_SECTIONS.map(sec => (
         <div key={sec.title} style={{ marginBottom: 28 }}>
@@ -89,19 +108,22 @@ export default function QuickListForm({ athlete, onChange, onAwardChange, onSubm
                   )}
                 </label>
                 {f.type === "select"
-                  ? <select value={athlete[f.key]} onChange={e => set(f.key, e.target.value)} disabled={pendingCompletion}>
+                  ? <select value={athlete[f.key]} onChange={e => set(f.key, e.target.value)} disabled={pendingCompletion}
+                      style={pendingCompletion ? { opacity: 0.45, cursor: 'not-allowed' } : {}}>
                       <option value="" disabled>Select Primary Recruited Position</option>
                       {f.options.map(o => <option key={o} value={o}>{o}</option>)}
                     </select>
                   : f.type === "gradYear"
-                  ? <select value={athlete[f.key]} onChange={e => set(f.key, e.target.value)} disabled={pendingCompletion}>
+                  ? <select value={athlete[f.key]} onChange={e => set(f.key, e.target.value)} disabled={pendingCompletion}
+                      style={pendingCompletion ? { opacity: 0.45, cursor: 'not-allowed' } : {}}>
                       <option value="" disabled>Select Graduation Year</option>
                       {Array.from({ length: 11 }, (_, i) => new Date().getFullYear() + i).map(y => (
                         <option key={y} value={y}>{y}</option>
                       ))}
                     </select>
                   : f.type === "dependents"
-                  ? <select value={athlete[f.key]} onChange={e => set(f.key, e.target.value)} disabled={pendingCompletion}>
+                  ? <select value={athlete[f.key]} onChange={e => set(f.key, e.target.value)} disabled={pendingCompletion}
+                      style={pendingCompletion ? { opacity: 0.45, cursor: 'not-allowed' } : {}}>
                       <option value="" disabled>Select</option>
                       <option value="1">1</option>
                       <option value="2">2</option>
@@ -116,6 +138,7 @@ export default function QuickListForm({ athlete, onChange, onAwardChange, onSubm
                       value={athlete[f.key] ? "$" + parseInt(String(athlete[f.key]).replace(/[^0-9]/g, "") || "0").toLocaleString() : ""}
                       placeholder={f.ph}
                       readOnly={pendingCompletion}
+                      style={pendingCompletion ? { opacity: 0.45, cursor: 'not-allowed' } : {}}
                       onChange={e => {
                         const raw = e.target.value.replace(/[^0-9]/g, "");
                         set(f.key, raw);
@@ -123,6 +146,7 @@ export default function QuickListForm({ athlete, onChange, onAwardChange, onSubm
                     />
                   : <input type={f.type} value={athlete[f.key]} placeholder={f.ph}
                       readOnly={pendingCompletion}
+                      style={pendingCompletion ? { opacity: 0.45, cursor: 'not-allowed' } : {}}
                       onChange={e => set(f.key, e.target.value)} />
                 }
               </div>
@@ -163,7 +187,7 @@ export default function QuickListForm({ athlete, onChange, onAwardChange, onSubm
         </div>
         <div style={{ display: "flex", gap: 20, flexWrap: "wrap" }}>
           {AWARD_OPTIONS.map(a => (
-            <label key={a.key} className="award-label" style={{ color: athlete.awards[a.key] ? "var(--accent)" : "var(--muted)" }}>
+            <label key={a.key} className="award-label" style={{ color: athlete.awards[a.key] ? "var(--accent)" : "var(--muted)", ...(pendingCompletion ? { opacity: 0.45, cursor: 'not-allowed' } : {}) }}>
               <input type="checkbox" checked={athlete.awards[a.key]}
                 disabled={pendingCompletion}
                 onChange={e => onAwardChange(a.key, e.target.checked)} />
@@ -173,21 +197,7 @@ export default function QuickListForm({ athlete, onChange, onAwardChange, onSubm
         </div>
       </div>
 
-      {pendingCompletion ? (
-        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          <button className="form-submit" onClick={onResendSetup} disabled={loading} style={{ flex: 1 }}>
-            Resend Setup Email →
-          </button>
-          <div style={{ textAlign: "center" }}>
-            <button
-              onClick={onStartOver}
-              style={{ background: "none", border: "none", color: "var(--muted)", fontSize: 13, cursor: "pointer", textDecoration: "underline" }}
-            >
-              Wrong email or want to start over?
-            </button>
-          </div>
-        </div>
-      ) : (
+      {!pendingCompletion && (
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
           <button className="form-submit" onClick={() => onSubmit(false)} disabled={loading} style={{ flex: 1 }}>
             {loading ? "Running GRIT FIT Formula…" : hasSaid ? "Update My GRIT Fit →" : "Generate My GRIT Fit →"}
