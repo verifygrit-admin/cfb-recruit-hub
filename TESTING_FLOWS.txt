@@ -85,9 +85,11 @@ Steps:
   3. When the AuthModal appears — DISMISS IT (click X or Cancel)
      Do NOT create a password. Account must remain in "pending" status.
   4. Open GrittyOS DB spreadsheet → Recruits tab → find the new row
-  5. Copy the value in col 25 (pendingToken)
-  6. Construct the magic link manually:
-     https://verifygrit-admin.github.io/cfb-recruit-hub/?completeSAID=<SAID>&token=<pendingToken>&email=<encoded-email>
+  5. Copy the value in col 25 (pendingToken) and col 7 (email)
+  6. Construct the magic link manually (all three params required —
+     omitting email leaves the display field blank):
+     https://verifygrit-admin.github.io/cfb-recruit-hub/?completeSAID=<SAID>&token=<pendingToken>&email=<url-encoded-email>
+     Example encoding: athlete@email.com → athlete%40email.com
   7. Paste the link into the browser and navigate to it
   8. Expect: app opens, password-set modal appears (title: "Complete Your
      Account Access") pre-filled with the SAID
@@ -102,6 +104,7 @@ Pass criteria:
   - Session established — user is logged in immediately after
   - Modal title reads "Complete Your Account Access" (not "Create Your Account")
     confirming pendingToken prop was passed to AuthModal
+  - Email field in modal is pre-filled and read-only (greyed out, not editable)
 
 Status: [ ]
 Notes:
