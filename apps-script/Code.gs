@@ -46,8 +46,6 @@ function doPost(e) {
     if (action === "forgotPassword")return jsonResponse(forgotPassword(body));
     if (action === "resetPassword") return jsonResponse(resetPassword(body));
     if (action === "completePendingAccount")       return jsonResponse(completePendingAccount(body));
-    if (action === "requestEmailChange")           return jsonResponse(requestEmailChange(body));
-    if (action === "confirmEmailChange")           return jsonResponse(confirmEmailChange(body));
     if (action === "requestEmailChangeMagicLink")  return jsonResponse(requestEmailChangeMagicLink(body));
     if (action === "confirmEmailChangeMagicLink")  return jsonResponse(confirmEmailChangeMagicLink(body));
     if (action === "resendSetupEmail")             return jsonResponse(resendSetupEmail(body));
@@ -654,35 +652,6 @@ function resendSetupEmail(payload) {
   return { error: "No pending profile found for this email." };
 }
 
-function requestEmailChange(payload) {
-  const { said, sessionToken, newEmail } = payload;
-  if (!said || !sessionToken || !newEmail) return { error: "Missing required fields." };
-  const authSheet = getOrCreateAuthSheet();
-  const authRow = findAuthRow(authSheet, 1, said);
-  if (authRow < 0) return { error: "Account not found." };
-  const vals = authSheet.getRange(authRow, 1, 1, 12).getValues()[0];
-  const storedToken  = String(vals[4] || "");
-  const storedExpiry = vals[5];
-  if (storedToken !== String(sessionToken)) return { error: "Invalid session." };
-  if (!storedExpiry || new Date() > new Date(storedExpiry)) return { error: "Session expired." };
-  const existingRow = findAuthRow(authSheet, 2, newEmail);
-  if (existingRow > 0 && existingRow !== authRow) return { error: "This email is already in use by another account." };
-  authSheet.getRange(authRow, 2).setValue(newEmail);
-  const ss = SpreadsheetApp.openById(GRITTY_DB_SHEET_ID);
-  const recruitSheet = ss.getSheetByName(RECRUITS_TAB_NAME);
-  if (recruitSheet) {
-    const lastRow = recruitSheet.getLastRow();
-    for (let row = 2; row <= lastRow; row++) {
-      if (String(recruitSheet.getRange(row, 1).getValue()) === String(said)) {
-        recruitSheet.getRange(row, 7).setValue(newEmail);
-        break;
-      }
-    }
-  }
-  logAuth(said, newEmail, "email_changed_direct", "");
-  return { ok: true, email: newEmail };
-}
-
 function requestEmailChangeMagicLink(payload) {
   const { said, sessionToken, newEmail } = payload;
   if (!said || !sessionToken || !newEmail) return { error: "Missing required fields." };
@@ -748,37 +717,6 @@ function confirmEmailChangeMagicLink(payload) {
     }
   }
   logAuth(said, pendingEmail, "email_changed_via_link", "");
-  return { ok: true, email: pendingEmail };
-}
-
-function confirmEmailChange(payload) {
-  const { said, verifyCode } = payload;
-  if (!said || !verifyCode) return { error: "Missing required fields." };
-  const authSheet = getOrCreateAuthSheet();
-  const authRow = findAuthRow(authSheet, 1, said);
-  if (authRow < 0) return { error: "Account not found." };
-  const pendingEmail = String(authSheet.getRange(authRow, 13).getValue() || "");
-  const storedCode   = String(authSheet.getRange(authRow, 14).getValue() || "");
-  const expiryStr    = String(authSheet.getRange(authRow, 15).getValue() || "");
-  if (!pendingEmail) return { error: "No pending email change found." };
-  if (storedCode !== String(verifyCode).trim()) return { error: "Invalid verification code." };
-  if (expiryStr && new Date() > new Date(expiryStr)) return { error: "Verification code expired. Please request a new one." };
-  authSheet.getRange(authRow, 2).setValue(pendingEmail);
-  authSheet.getRange(authRow, 13).setValue("");
-  authSheet.getRange(authRow, 14).setValue("");
-  authSheet.getRange(authRow, 15).setValue("");
-  const ss = SpreadsheetApp.openById(GRITTY_DB_SHEET_ID);
-  const recruitSheet = ss.getSheetByName(RECRUITS_TAB_NAME);
-  if (recruitSheet) {
-    const lastRow = recruitSheet.getLastRow();
-    for (let row = 2; row <= lastRow; row++) {
-      if (String(recruitSheet.getRange(row, 1).getValue()) === String(said)) {
-        recruitSheet.getRange(row, 7).setValue(pendingEmail);
-        break;
-      }
-    }
-  }
-  logAuth(said, pendingEmail, "email_changed", "");
   return { ok: true, email: pendingEmail };
 }
 

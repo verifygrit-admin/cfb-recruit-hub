@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { POSITIONS } from "../lib/constants.js";
-import { updateRecruit, requestEmailChange } from "../lib/api.js";
+import { updateRecruit, requestEmailChangeMagicLink } from "../lib/api.js";
 import teamPhoto from "../assets/bchigh-team.jpg";
 
 const PROFILE_SECTIONS = [
@@ -71,7 +71,7 @@ export default function SettingsPage({ auth, athlete, onChange, onAwardChange, o
     if (newEmail.trim() === auth.email) { setEmailError("That is already your current email address."); return; }
     setEmailSending(true); setEmailError(null);
     try {
-      const r = await requestEmailChange(auth.said, auth.sessionToken, newEmail.trim());
+      const r = await requestEmailChangeMagicLink(auth.said, auth.sessionToken, newEmail.trim());
       if (r.error) { setEmailError(r.error); return; }
       setEmailSent(true);
     } catch(e) {
@@ -161,9 +161,9 @@ export default function SettingsPage({ auth, athlete, onChange, onAwardChange, o
 
           {emailSent && (
             <div style={{ marginTop: 14, padding: "10px 14px", background: "#0a1f0d", border: "1px solid #2e6b18", borderRadius: 3 }}>
-              <div style={{ color: "#6ed430", fontSize: 13, fontWeight: 700, marginBottom: 4 }}>Email updated!</div>
+              <div style={{ color: "#6ed430", fontSize: 13, fontWeight: 700, marginBottom: 4 }}>Confirmation link sent!</div>
               <div style={{ color: "var(--muted)", fontSize: 12, lineHeight: 1.5 }}>
-                Your email has been changed to <strong style={{ color: "#c8f5a0" }}>{newEmail}</strong>. Sign out and back in to see the update.
+                Check <strong style={{ color: "#c8f5a0" }}>{newEmail}</strong> for a confirmation link. Your email will update after you click it.
               </div>
               <button
                 onClick={() => { setEmailSent(false); setShowEmailForm(false); setNewEmail(""); }}
