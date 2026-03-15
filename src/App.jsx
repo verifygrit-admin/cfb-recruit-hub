@@ -541,8 +541,7 @@ export default function App() {
 
         if (isNewPerson) {
           // New profile for a different person — create new SAID, preserve current session
-          savedResultsRef.current = results;
-          savedAthleteRef.current = { ...athlete };
+          // (savedResultsRef / savedAthleteRef captured in handleNewProfile before form was blanked)
           const r = await saveRecruit({ ...parsed, timestamp: new Date().toISOString() });
           const newSaid = r?.said || null;
           if (newSaid) {
@@ -586,6 +585,8 @@ export default function App() {
   }
 
   function handleNewProfile() {
+    savedResultsRef.current = results;    // capture before clearing
+    savedAthleteRef.current = { ...athlete }; // capture before blanking
     setResults(null);
     setAthlete(BLANK_ATHLETE);
     setSavedIdentity(null);
