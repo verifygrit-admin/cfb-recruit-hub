@@ -54,6 +54,19 @@ BL-004 | 2026-03-22 | Dexter (Gate 0/1 audit) | LOW | Open
   Suggested action: Add cols 13-15 header labels to getOrCreateAuthSheet().
   Do NOT touch until explicitly scheduled — no impact on live platform.
 
+BL-005 | 2026-03-22 | Scout/Rio (Gate 0 retroactive tag push) | LOW | Accepted — Known Artifact
+  CI failures on commits e168486 (v1.1.2), 9cd87f9 (v1.1.3), fb00d9e (v1.1.5)
+  from retroactive tag push on 2026-03-22.
+  Root cause: those commits predate commit 606e605 (fix: correct
+  claude-review.yml YAML indentation). GitHub evaluates workflow files
+  AT the tagged commit — malformed on: key at those historical commits
+  caused claude-review.yml to fire on tag push and fail (no PR context).
+  Live app: UNAFFECTED. deploy.yml only triggers on push to master (not tags).
+  Resolution: Accepted as expected artifact of historical YAML bug.
+  Rule added: DEC-GLOBAL-006-B — never push retroactive tags to commits
+  that predate a CI/CD workflow fix without accepting expected failures.
+  Do NOT re-run or attempt to fix these workflow runs — they are historical.
+
 ================================================================
 
 INSTRUCTIONS FOR SCRIBE
