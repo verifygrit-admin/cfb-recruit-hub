@@ -47,8 +47,21 @@
   .agent-card { background: #0e1510; border: 1px solid #2a3d2d; border-radius: 8px; overflow: hidden; margin-bottom: 24px; }
   .agent-card-header { background: #0a2e14; padding: 16px 20px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid #2a3d2d; }
   .agent-icon { width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-family: 'Bebas Neue', sans-serif; font-size: 15px; flex-shrink: 0; }
-  .icon-auditor { background: #1a3d1a; color: #6ed430; border: 1px solid #3b6d11; }
-  .icon-monitor { background: #1a2a3d; color: #4fc3f7; border: 1px solid #1a5a7a; }
+  /* Sprite face bubbles — zoomed 2x, centered on face of front-facing frame */
+  .icon-auditor     { border: 2px solid #7a1a1a; background-image: url('../../../chris-miniverse/public/universal_assets/citizens/morty_walk.png'); background-size: 512px 512px; background-position: -45px -9px; background-repeat: no-repeat; }
+  .icon-monitor     { border: 2px solid #1a5a7a; background-image: url('../../../chris-miniverse/public/universal_assets/citizens/dexter_walk.png'); background-size: 512px 512px; background-position: -45px -9px; background-repeat: no-repeat; }
+  .icon-version     { border: 2px solid #6a3d7a; background-image: url('../../../chris-miniverse/public/universal_assets/citizens/rio_walk.png');   background-size: 512px 512px; background-position: -45px -9px; background-repeat: no-repeat; }
+  .icon-gas         { border: 2px solid #7a5a00; background-image: url('http://localhost:5173/universal_assets/citizens/nova_walk.png'); background-size: 512px 512px; background-position: -45px -9px; background-repeat: no-repeat; }
+  /* Card header tints per agent */
+  .card-header-auditor  { background: #1f0808 !important; border-bottom-color: #3d1010 !important; }
+  .card-header-monitor  { background: #08101f !important; border-bottom-color: #103050 !important; }
+  .card-header-version  { background: #120820 !important; border-bottom-color: #3d1a5a !important; }
+  .card-header-gas      { background: #1a1200 !important; border-bottom-color: #3d2e00 !important; }
+  /* Section label tints per agent */
+  .label-auditor  { color: #a04040 !important; }
+  .label-monitor  { color: #2a7a9a !important; }
+  .label-version  { color: #7a4a9a !important; }
+  .label-gas      { color: #b88a00 !important; }
   .agent-name { font-family: 'Bebas Neue', sans-serif; font-size: 22px; letter-spacing: 2px; color: #c8f5a0; }
   .agent-tagline { font-size: 12px; color: #6b8c72; font-family: 'Barlow', sans-serif; margin-top: 2px; }
   .agent-meta { margin-left: auto; text-align: right; font-size: 11px; color: #4a6b4d; font-family: 'Barlow Condensed', sans-serif; letter-spacing: 0.5px; line-height: 1.6; }
@@ -111,30 +124,31 @@
     <div class="header-title">CFB Recruit Hub — Agents</div>
     <div class="header-sub">Claude Code Agent Reference</div>
   </div>
-  <div class="header-badge">3 Agents</div>
+  <div class="header-badge">4 Agents</div>
 </div>
 
 <div class="tabs">
   <div class="tab active" onclick="showTab('auditor', this)">Auditor</div>
   <div class="tab" onclick="showTab('monitor', this)">Monitor</div>
   <div class="tab" onclick="showTab('version', this)">Version Manager</div>
+  <div class="tab" onclick="showTab('gas', this)">GAS Engineer</div>
 </div>
 
 <div class="content">
 
   <!-- ══════════════════════════════════════════════ AUDITOR ══ -->
-  <div class="panel active" id="panel-auditor">
+  <div class="panel active" id="panel-auditor" data-theme="auditor">
     <div class="agent-card">
-      <div class="agent-card-header">
-        <div class="agent-icon icon-auditor">AUD</div>
+      <div class="agent-card-header card-header-auditor">
+        <div class="agent-icon icon-auditor"></div>
         <div>
-          <div class="agent-name">cfb-recruit-hub-auditor</div>
+          <div class="agent-name">cfb-recruit-hub-auditor <span style="font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:2px;color:#7a1a1a;vertical-align:middle">· MORTY</span></div>
           <div class="agent-tagline">Full architecture audit — Foundation · Integration · Surface · Gaps</div>
         </div>
         <div class="agent-meta">
           <div>Model: sonnet</div>
           <div>Memory: project</div>
-          <div style="margin-top:4px; color:#2a3d2d">cfb-recruit-hub-auditor.md</div>
+          <div style="margin-top:4px; color:#3d1a1a">cfb-recruit-hub-auditor.md</div>
         </div>
       </div>
 
@@ -247,18 +261,18 @@ QUALITY STANDARDS
 
 
   <!-- ══════════════════════════════════════════════ MONITOR ══ -->
-  <div class="panel" id="panel-monitor">
+  <div class="panel" id="panel-monitor" data-theme="monitor">
     <div class="agent-card">
-      <div class="agent-card-header">
-        <div class="agent-icon icon-monitor">MON</div>
+      <div class="agent-card-header card-header-monitor">
+        <div class="agent-icon icon-monitor"></div>
         <div>
-          <div class="agent-name">cfb-recruit-hub-monitor</div>
+          <div class="agent-name">cfb-recruit-hub-monitor <span style="font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:2px;color:#1a5a7a;vertical-align:middle">· DEXTER</span></div>
           <div class="agent-tagline">Platform health · Auth integrity · Formula validation · Collision risk</div>
         </div>
         <div class="agent-meta">
           <div>Model: sonnet</div>
           <div>Memory: project</div>
-          <div style="margin-top:4px; color:#2a3d2d">cfb-recruit-hub-monitor.md</div>
+          <div style="margin-top:4px; color:#1a3d5a">cfb-recruit-hub-monitor.md</div>
         </div>
       </div>
 
@@ -430,19 +444,19 @@ WHAT YOU DO NOT DO
 
 
   <!-- ══════════════════════════════════════════════ VERSION MANAGER ══ -->
-  <div class="panel" id="panel-version">
+  <div class="panel" id="panel-version" data-theme="version">
     <div class="agent-card">
-      <div class="agent-card-header">
-        <div class="agent-icon icon-version">VER</div>
+      <div class="agent-card-header card-header-version">
+        <div class="agent-icon icon-version"></div>
         <div>
-          <div class="agent-name">version-manager</div>
+          <div class="agent-name">version-manager <span style="font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:2px;color:#6a3d7a;vertical-align:middle">· RIO</span></div>
           <div class="agent-tagline">Global semantic versioning — reads git log, proposes bump, tags + pushes on confirm</div>
         </div>
         <div class="agent-meta">
           <div>Model: sonnet</div>
           <div>Memory: project</div>
           <div>Scope: global</div>
-          <div style="margin-top:4px; color:#2a3d2d">version-manager.md</div>
+          <div style="margin-top:4px; color:#3d1a5a">version-manager.md</div>
         </div>
       </div>
 
@@ -532,15 +546,139 @@ or say "edit changelog" before I proceed.</div>
     </div>
   </div><!-- /panel-version -->
 
+
+  <!-- ══════════════════════════════════════════════ GAS ENGINEER ══ -->
+  <div class="panel" id="panel-gas" data-theme="gas">
+    <div class="agent-card">
+      <div class="agent-card-header card-header-gas">
+        <div class="agent-icon icon-gas"></div>
+        <div>
+          <div class="agent-name">gas-engineer <span style="font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:2px;color:#7a5a00;vertical-align:middle">· PATCH</span></div>
+          <div class="agent-tagline">Google Apps Script expert — Code.gs repair, schema validation, gws CLI integration, migration prep</div>
+        </div>
+        <div class="agent-meta">
+          <div>Sprite: patch</div>
+          <div>Model: sonnet</div>
+          <div>Memory: project</div>
+          <div style="margin-top:4px; color:#3d2e00">gas-engineer.md</div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-label label-gas">Trigger Phrases — say to Claude</div>
+        <div class="triggers">
+          <div class="trigger">fix the cols 24-26 bug in Code.gs</div>
+          <div class="trigger">run the GAS engineer on [task]</div>
+          <div class="trigger">fix the email change flow</div>
+          <div class="trigger">validate the Recruits tab schema</div>
+          <div class="trigger">document the sheet schema for migration</div>
+          <div class="trigger">what does [function] do in Code.gs?</div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-label label-gas">Active Task Queue (v1.1.x)</div>
+        <div class="resp-list">
+          <div class="resp-item">
+            <div class="resp-title" style="color:#d4a017">v1.1.1 — CRITICAL: Recruits cols 24–26 collision</div>
+            <ul class="resp-bullets">
+              <li>updateRecruitAuthFields overwrites status/pendingToken/expiry with login timestamps</li>
+              <li>Fix: move lastLogin/lastLogout/loginCount to cols 27–29</li>
+              <li>Validate with gws CLI before and after</li>
+            </ul>
+          </div>
+          <div class="resp-item">
+            <div class="resp-title" style="color:#d4a017">v1.1.2 — Orphaned profiles on GPA-fail / no-top50</div>
+            <ul class="resp-bullets">
+              <li>saveRecruit fires but setSaid/AuthModal never shows — profile stuck as "pending"</li>
+              <li>Verify saveRecruit response shape; coordinate fix in App.jsx</li>
+            </ul>
+          </div>
+          <div class="resp-item">
+            <div class="resp-title" style="color:#d4a017">v1.1.3 — Email change path: pick one</div>
+            <ul class="resp-bullets">
+              <li>Two paths exist: direct (immediate) + magic link (confirmed)</li>
+              <li>Recommended: keep magic link, update SettingsPage, delete direct path</li>
+            </ul>
+          </div>
+          <div class="resp-item">
+            <div class="resp-title" style="color:#d4a017">v1.1.4 — Remove or build 6-digit verify modal</div>
+            <ul class="resp-bullets">
+              <li>confirmEmailChange exists in Code.gs + api.js but no frontend calls it</li>
+              <li>If magic link chosen: delete both. If code chosen: build EmailVerifyModal.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-label label-gas">GWS CLI — Sheet Inspection</div>
+        <div class="cmd-block">
+          <div class="cmd-label">Read Recruits headers</div>
+          <div class="cmd-code" id="gas-cmd-1">gws sheets +read --spreadsheet 1Pc4LOnD1fhQz-9pI_CUEDaAMDfTkUXcCRTVDfoDWvqo --range "Recruits!A1:AC1" --format table</div>
+          <button class="copy-btn" onclick="copy('gas-cmd-1',this)">Copy</button>
+        </div>
+        <div class="cmd-block">
+          <div class="cmd-label">Read Auth headers</div>
+          <div class="cmd-code" id="gas-cmd-2">gws sheets +read --spreadsheet 1Pc4LOnD1fhQz-9pI_CUEDaAMDfTkUXcCRTVDfoDWvqo --range "Auth!A1:O1" --format table</div>
+          <button class="copy-btn" onclick="copy('gas-cmd-2',this)">Copy</button>
+        </div>
+        <div class="cmd-block">
+          <div class="cmd-label">Read a recruit row</div>
+          <div class="cmd-code" id="gas-cmd-3">gws sheets +read --spreadsheet 1Pc4LOnD1fhQz-9pI_CUEDaAMDfTkUXcCRTVDfoDWvqo --range "Recruits!A2:AC2" --format table</div>
+          <button class="copy-btn" onclick="copy('gas-cmd-3',this)">Copy</button>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-label label-gas">Phase Roadmap</div>
+        <ul class="when-list">
+          <li><div class="when-dot" style="background:#7a5a00"></div><strong style="color:#d4a017">Phase 1 (v1.1.x):</strong>&nbsp; Fix data integrity bugs in Code.gs; validate all auth flows; mark TESTING_FLOWS.txt complete</li>
+          <li><div class="when-dot" style="background:#7a5a00"></div><strong style="color:#d4a017">Phase 2 (v1.2.0):</strong>&nbsp; Maintain Apps Script API stability as React Router is added; freeze all ?action= param names</li>
+          <li><div class="when-dot" style="background:#7a5a00"></div><strong style="color:#d4a017">Phase 3 (v2.0.0):</strong>&nbsp; Produce PostgreSQL DDL + REST mapping from live gws CLI reads; prep Supabase migration spec</li>
+        </ul>
+      </div>
+
+    </div>
+  </div><!-- /panel-gas -->
+
 </div><!-- /content -->
 
 <script>
+const THEME_COLORS = {
+  auditor: { tab: '#ef5350', dot: '#7a1a1a', label: '#a04040' },
+  monitor: { tab: '#4fc3f7', dot: '#1a5a7a', label: '#2a7a9a' },
+  version: { tab: '#ce93d8', dot: '#6a3d7a', label: '#7a4a9a' },
+  gas:     { tab: '#d4a017', dot: '#7a5a00', label: '#b88a00' },
+  default: { tab: '#6ed430', dot: '#3b6d11', label: '#3b6d11' },
+};
+
+function applyTheme(panelEl) {
+  const theme = panelEl.dataset.theme;
+  const colors = THEME_COLORS[theme] || THEME_COLORS.default;
+  panelEl.querySelectorAll('.section-label').forEach(el => el.style.color = colors.label);
+  panelEl.querySelectorAll('.when-dot, .note-dot, .footer-dot').forEach(el => el.style.background = colors.dot);
+}
+
 function showTab(id, el) {
   document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
-  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-  document.getElementById('panel-' + id).classList.add('active');
+  document.querySelectorAll('.tab').forEach(t => { t.classList.remove('active'); t.style.color = ''; t.style.borderColor = ''; });
+  const panel = document.getElementById('panel-' + id);
+  panel.classList.add('active');
+  const theme = panel.dataset.theme;
+  const colors = THEME_COLORS[theme] || THEME_COLORS.default;
   el.classList.add('active');
+  el.style.color = colors.tab;
+  el.style.borderColor = colors.tab;
 }
+
+// Apply themes on load
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('.panel').forEach(applyTheme);
+  // Set initial active tab color
+  const firstTab = document.querySelector('.tab.active');
+  if (firstTab) { firstTab.style.color = THEME_COLORS.auditor.tab; firstTab.style.borderColor = THEME_COLORS.auditor.tab; }
+});
 
 function copy(id, btn) {
   const text = document.getElementById(id).textContent;
