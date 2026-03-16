@@ -24,13 +24,16 @@ BL-001 | 2026-03-16 | Patch (v1.1.4 audit) | HOUSEKEEPING | Closed (v1.1.5 — 2
   Suggested action: Remove only requestEmailChange and
   confirmEmailChange. Dexter spot-checks before Patch removes.
 
-BL-002 | 2026-03-16 | Scout (session close-out) | HIGH | Open
+BL-002 | 2026-03-16 | Scout (session close-out) | HIGH | Closed (2026-03-22)
   Run TESTING_FLOWS.txt Flows 1–5 against live platform.
   Code was fixed in v1.1.1–v1.1.3 but test runs have never been executed.
   Must complete before Stage 2 work begins (per DEC-GLOBAL-005).
   Owner: Nova executes, Dexter confirms results, Scout closes.
   Acceptance: All five flows reach [x] status in TESTING_FLOWS.txt
   with logged dates and notes.
+  Closed: 2026-03-22 — all 6 flows [x]; Dexter issued formal PASS (Gate 3);
+  Scout stamped Stage 1 CLOSED (Gate 4). Sage brief + Morty arch flags
+  filed as Stage 2 kickoff inputs.
 
 BL-003 | 2026-03-16 | Sage (prescience assessment) | LOW | Open
   BC High image (bchigh-team.jpg) hardcoded in QuickListForm.jsx (line 3)
@@ -66,6 +69,29 @@ BL-005 | 2026-03-22 | Scout/Rio (Gate 0 retroactive tag push) | LOW | Accepted �
   Rule added: DEC-GLOBAL-006-B — never push retroactive tags to commits
   that predate a CI/CD workflow fix without accepting expected failures.
   Do NOT re-run or attempt to fix these workflow runs — they are historical.
+
+BL-006 | 2026-03-22 | Morty (Stage 1 close-out architecture check) | MEDIUM | Open
+  updateRecruit() row scan iterates one cell at a time per row (Code.gs line ~215).
+  Current pattern: for loop calling sheet.getRange(row, 1).getValue() per row.
+  Acceptable at current test data volume. At real user scale this is a performance
+  bottleneck — each cell read is a separate Sheets API call inside the loop.
+  Fix: read the full SAID column in one getRange() call, find the matching row index
+  via array search, then update. Pattern already used elsewhere in codebase.
+  File: apps-script/Code.gs (updateRecruit function)
+  Flagged during: Stage 1 close-out architecture check, 2026-03-22
+  Stage 2 kickoff: YES — on agenda (performance baseline before real user traffic)
+  Do NOT touch until explicitly scheduled.
+
+BL-007 | 2026-03-22 | Morty (Stage 1 close-out architecture check) | MEDIUM | Open
+  checkEmail() reads 24 columns across the entire Recruits sheet on every form
+  email keystroke (or submit). Current pattern: getRange(2, 1, lastRow-1, 24).getValues()
+  — full sheet read. Benign at current data volume; becomes expensive as Recruits
+  tab grows. Fix: read only the email column (col 7) and status column (col 24) —
+  two-column read instead of 24. Reduces data transfer and processing per call.
+  File: apps-script/Code.gs (checkEmail function)
+  Flagged during: Stage 1 close-out architecture check, 2026-03-22
+  Stage 2 kickoff: YES — on agenda (performance baseline before real user traffic)
+  Do NOT touch until explicitly scheduled.
 
 ================================================================
 

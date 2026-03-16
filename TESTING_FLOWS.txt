@@ -17,7 +17,9 @@ CURRENT STATE (as of 2026-03-22)
   Flow 6:   [x] DONE — fixed commit 25373d9; verified working
   Flow 1:   [x] DONE — bug found and fixed (commit 52f0e4e); verified working
   Flow 2:   [x] DONE — spec rewritten, UX fixes applied (commits 78c7737, 5ebed98, 130a271); verified working
-  Flows 3-5: [ ] Pending execution against live platform (BL-002)
+  Flow 3:   [x] DONE — MailApp OAuth fixed (re-auth via testMailAuth + @32 deploy); verified working
+  Flow 4:   [x] DONE — silent update verified; scoring recalculation confirmed working
+  Flow 5:   [x] DONE — GPA-fail path verified; updateRecruit confirmed; no duplicate SAID
 
 
 ── FLOW 1: Submit New Profile While Logged In (Different Email) ──────────────
@@ -149,9 +151,13 @@ Pass criteria:
   - Old email-A no longer works to sign in
   - email-B signs in successfully
 
-Status: [ ]
-Notes:
-
+Status: [x]
+Notes: 2026-03-22 — Passed. MailApp OAuth was not authorized (silent failure throughout
+       prior testing). Fix: added testMailAuth() to Code.gs, clasp pushed, ran once in
+       editor to grant script.send_mail scope, removed function, redeployed @32.
+       Magic link email arrived at email-B. confirmEmailChangeMagicLink updated Auth +
+       Recruits tabs. Old email-A sign-in disabled. email-B sign-in confirmed working.
+       Re-auth procedure documented in Code.gs header.
 
 ── FLOW 4: Edit My Profile — Same Email (Silent Update) ──────────────────────
 Goal: Signed-in user edits profile fields (not email) → updateRecruit called →
@@ -171,9 +177,10 @@ Pass criteria:
   - Recruits tab row updated with new values
   - SAID unchanged
 
-Status: [ ]
-Notes:
-
+Status: [x]
+Notes: 2026-03-22 — Passed. Height change triggered GRIT Fit recalculation — scoring
+       algorithm responding correctly to profile updates. No modal, no email, immediate
+       success feedback. updateRecruit called (not saveRecruit). SAID unchanged.
 
 ── FLOW 5: GPA-Fail / No Top-50 While Logged In ──────────────────────────────
 Goal: Signed-in user submits GRIT Fit form but fails the GPA threshold or
@@ -195,9 +202,10 @@ Pass criteria:
   - No new SAID generated
   - Existing row timestamp updated
 
-Status: [ ]
-Notes:
-
+Status: [x]
+Notes: 2026-03-22 — Passed. GPA-fail state triggered correctly. updateRecruit called
+       (not saveRecruit). No new SAID created. No AuthModal shown. Existing row
+       timestamp updated in Recruits tab.
 
 ── FLOW 6: Short List Persistence Across Sign Out / Sign In ──────────────────
 Goal: Short list saved to server (SL-{SAID} tab) is restored correctly when

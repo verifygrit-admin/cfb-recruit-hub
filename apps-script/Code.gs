@@ -1,6 +1,17 @@
 // ── GRIT FIT — CFB Recruit Hub — Apps Script Web App ──────────────────────────
 // Deploy as: Execute as Me | Anyone (even anonymous) can access
 // After deploying, copy the Web App URL into VITE_API_BASE in your .env file.
+//
+// ── MAILAPP RE-AUTHORIZATION (if MailApp.sendEmail fails with permission error) ─
+// The script.send_mail scope is declared in appsscript.json. If it ever loses
+// authorization (e.g. Chris revokes app permissions in Google account settings),
+// add this function temporarily, clasp push, run it once in the editor, then remove:
+//
+//   function testMailAuth() {
+//     MailApp.sendEmail('chris@thinkwellspring.com', 'Auth test', 'scope check');
+//   }
+//
+// Authorization confirmed: 2026-03-22. Remove the function after re-auth, then redeploy.
 
 // ── CONFIGURATION ──────────────────────────────────────────────────────────────
 const GRITTY_DB_SHEET_ID  = "1Pc4LOnD1fhQz-9pI_CUEDaAMDfTkUXcCRTVDfoDWvqo";
@@ -32,6 +43,7 @@ function doGet(e) {
     return jsonResponse({ error: err.message });
   }
 }
+
 
 function doPost(e) {
   try {
