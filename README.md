@@ -204,3 +204,62 @@ GrittyOS is a college football recruiting advisory consortium and open-source pl
 ---
 
 *661 programs · FBS through Division III · All 50 states · Updated March 2026*
+
+---
+
+## Version History
+
+> **Current version: v2.0.0** — Stage 1 complete. All auth and profile flows verified against live platform. Stage 2 (Supabase migration) cleared to plan.
+
+---
+
+### v2.0.0 — Stage 1 Close-Out *(2026-03-22)*
+**Status: Current**
+
+Stage 1 milestone release. All six TESTING_FLOWS verified against the live platform by Chris Conroy. MailApp OAuth authorization confirmed and re-auth procedure documented. Pending account UX hardened. `checkEmail` updated to detect pending accounts and prevent duplicate SAIDs. Sage strategic brief and Morty architecture flags filed as Stage 2 kickoff inputs.
+
+- All TESTING_FLOWS.txt flows [x]: Submit New Profile (Flow 1), Magic Link Completion (Flow 2), Email Change (Flow 3), Silent Profile Update (Flow 4), GPA-Fail Path (Flow 5), Short List Persistence (Flow 6)
+- MailApp OAuth authorized; `script.send_mail` scope confirmed live; re-auth procedure documented in Code.gs header
+- Pending account state: form fields visually locked, green status banner, Resend Setup Email + Start Over at top
+- `checkEmail` now checks Recruits tab for pending accounts — prevents duplicate SAID on re-submission
+- GAS deployment @32; frontend commit db0e70e
+
+---
+
+### v1.2.0 — CI/CD Stability *(2026-03-22)*
+Deploy workflow updated to not cancel in-progress GitHub Pages deploys on sequential pushes. Prevents race conditions on rapid push sequences.
+
+---
+
+### v1.1.5 — Dead Code Removal *(2026-03-22)*
+Removed dead `requestEmailChange` and `confirmEmailChange` exports from `api.js` (BL-001). Flagged by Patch in v1.1.4 audit; confirmed safe by Dexter before removal.
+
+---
+
+### v1.1.3 — Email Change Module (Magic Link) *(2026-03-22)*
+Removed 6-digit email change verification path. Retained and stabilized magic link path only (`requestEmailChangeMagicLink` / `confirmEmailChangeMagicLink`). Auth tab cols 13–15 header labels repaired. `pendingToken` / `pendingTokenExpiry` system confirmed operational.
+
+---
+
+### v1.1.2 — Orphaned Profile Recovery *(2026-03-13)*
+Added detection for orphaned pending accounts on sign-in. Added Resend Setup Email flow for users who lost or never received their magic link. Prevents users from being permanently locked out of a pending SAID.
+
+---
+
+### v1.1.1 — Recruits Schema Repair *(2026-03-14)*
+Moved auth session fields from Recruits cols 24–26 to cols 27–29 to make room for `status`, `pendingToken`, and `pendingTokenExpiry`. `repairRecruitsHeaders()` utility added for one-time migration. Required manual run in Apps Script editor after deploy.
+
+---
+
+### v1.1.0 — Architecture Baseline *(2026-03-14)*
+Added agents reference documentation, platform roadmap, background image fix, and architecture audit output. Foundation for team-based development workflow.
+
+---
+
+### v1.0.0 — Initial Launch *(2026-03-13)*
+Settings page wired through `handleSubmit` for GPA check and scoring. Full GRIT FIT Formula operational end-to-end. SAID auth system live. 661 programs, all map and results table features active.
+
+---
+
+### v0.9.0 — Pre-Launch *(2026-03-13)*
+Pre-release build. Orphan pending account detection added; resend setup email flow introduced. Not publicly promoted.
