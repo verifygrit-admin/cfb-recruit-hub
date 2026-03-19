@@ -18,7 +18,14 @@ const GRITTY_DB_SHEET_ID  = "1Pc4LOnD1fhQz-9pI_CUEDaAMDfTkUXcCRTVDfoDWvqo";
 const DB_TAB_NAME         = "GrittyOS DB";   // sheet tab with school data
 const TRACKER_TAB_NAME    = "Tracker";       // optional: recruitment tracker tab
 const RECRUITS_TAB_NAME   = "Recruits";      // where recruit profiles are saved
+const RECRUITS_TEST_TAB_NAME = "Recruits_Test"; // isolated tab for CI/Playwright test runs
 const APP_URL             = "https://verifygrit-admin.github.io/cfb-recruit-hub/";
+
+// ── VERSION ─────────────────────────────────────────────────────────────────────
+// Bump GRIT_VERSION and GRIT_DEPLOYED on every deployment.
+// Consumed by ?action=version (Dexter + Sentinel health checks).
+const GRIT_VERSION  = "1.2.0";
+const GRIT_DEPLOYED = "2026-03-19";
 
 // ── ROUTER ─────────────────────────────────────────────────────────────────────
 function doGet(e) {
@@ -29,6 +36,8 @@ function doGet(e) {
     if (action === "getShortList")  return jsonResponse(getShortList(e.parameter.said));
     if (action === "validateToken") return jsonResponse(validateToken(e.parameter.said, e.parameter.token));
     if (action === "checkEmail")    return jsonResponse(checkEmail(e.parameter.email));
+    if (action === "version")       return jsonResponse(getVersion());
+    if (action === "getSAIDStats")  return jsonResponse(getSAIDStats());
     // Fallback: POST actions that arrive as GET due to redirect conversion
     if (action === "signIn")         return jsonResponse(signIn(e.parameter));
     if (action === "createAccount")  return jsonResponse(createAccount(e.parameter));
@@ -61,6 +70,8 @@ function doPost(e) {
     if (action === "requestEmailChangeMagicLink")  return jsonResponse(requestEmailChangeMagicLink(body));
     if (action === "confirmEmailChangeMagicLink")  return jsonResponse(confirmEmailChangeMagicLink(body));
     if (action === "resendSetupEmail")             return jsonResponse(resendSetupEmail(body));
+    if (action === "version")       return jsonResponse(getVersion());
+    if (action === "getSAIDStats")  return jsonResponse(getSAIDStats());
     return jsonResponse({ error: "Unknown action" });
   } catch (err) {
     return jsonResponse({ error: err.message });
@@ -104,6 +115,9 @@ function getTracker() {
   return { tracker };
 }
 
+// generateSAID — pure counter; MUST be called from within a LockService lock.
+// Reads the last SAID in column A and returns the next value.
+// Do NOT call this outside of saveRecruit's locked block — no standalone callers.
 function generateSAID(sheet) {
   const year    = new Date().getFullYear();
   const lastRow = sheet.getLastRow();
@@ -145,61 +159,111 @@ function checkEmail(email) {
   return { hasAccount: false };
 }
 
-function saveRecruit(profile) {
-  const ss    = SpreadsheetApp.openById(GRITTY_DB_SHEET_ID);
-  let sheet   = ss.getSheetByName(RECRUITS_TAB_NAME);
+// ── RECRUITS TAB HEADER ARRAY ───────────────────────────────────────────────────
+// Single source of truth for column layout — used by saveRecruit and
+// getOrCreateRecruitTestSheet. Any schema change must update this array.
+// Cols 1-23: profile data | 24-26: status/token | 27-29: auth event timestamps
+const RECRUITS_HEADERS = [
+  "SAID","timestamp","name","highSchool","gradYear","state","email","phone","twitter",
+  "position","height","weight","speed40",
+  "gpa","sat","hsLat","hsLng","agi","dependents",
+  "expectedStarter","captain","allConference","allState",
+  "status","pendingToken","pendingTokenExpiry",
+  "lastLogin","lastLogout","loginCount",
+];
 
-  // Create tab if it doesn't exist
+// getOrCreateRecruitTestSheet — idempotent. Returns the Recruits_Test sheet,
+// creating it with the canonical header array if it does not already exist.
+// Only called when testMode=true is present in the saveRecruit payload.
+function getOrCreateRecruitTestSheet() {
+  const ss = SpreadsheetApp.openById(GRITTY_DB_SHEET_ID);
+  let sheet = ss.getSheetByName(RECRUITS_TEST_TAB_NAME);
   if (!sheet) {
-    sheet = ss.insertSheet(RECRUITS_TAB_NAME);
-    const headers = [
-      "SAID","timestamp","name","highSchool","gradYear","state","email","phone","twitter",
-      "position","height","weight","speed40",
-      "gpa","sat","hsLat","hsLng","agi","dependents",
-      "expectedStarter","captain","allConference","allState",
-      "status","pendingToken","pendingTokenExpiry",
-      "lastLogin","lastLogout","loginCount",
-    ];
-    sheet.appendRow(headers);
+    sheet = ss.insertSheet(RECRUITS_TEST_TAB_NAME);
+    sheet.appendRow(RECRUITS_HEADERS);
+  }
+  return sheet;
+}
+
+function saveRecruit(profile) {
+  const ss     = SpreadsheetApp.openById(GRITTY_DB_SHEET_ID);
+  const isTest = profile.testMode === true || profile.testMode === "true";
+
+  // ── LockService guard ────────────────────────────────────────────────────────
+  // Scope: script lock (one at a time across all users and executions).
+  // Timeout: 10 000 ms. If the lock cannot be acquired inside the window,
+  // return an error rather than proceeding and risking a duplicate SAID.
+  // The lock wraps both generateSAID() and appendRow() as an atomic unit —
+  // do not move any sheet write outside this block.
+  const lock = LockService.getScriptLock();
+  const acquired = lock.tryLock(10000);
+  if (!acquired) {
+    return { error: "Server busy — please try again in a moment." };
   }
 
-  const said = generateSAID(sheet);
-  const pendingToken = Utilities.getUuid();
-  const pendingExpiry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+  let said, pendingToken, pendingExpiry;
+  try {
+    let sheet = isTest
+      ? getOrCreateRecruitTestSheet()
+      : ss.getSheetByName(RECRUITS_TAB_NAME);
 
-  sheet.appendRow([
-    said,
-    new Date().toISOString(),
-    profile.name || "",
-    profile.highSchool || "",
-    profile.gradYear || "",
-    profile.state || "",
-    profile.email || "",
-    profile.phone || "",
-    profile.twitter || "",
-    profile.position || "",
-    profile.height || "",
-    profile.weight || "",
-    profile.speed40 || "",
-    profile.gpa || "",
-    profile.sat || "",
-    profile.hsLat || "",
-    profile.hsLng || "",
-    profile.agi || "",
-    profile.dependents || "",
-    profile.awards?.expectedStarter ? "TRUE" : "",
-    profile.awards?.captain         ? "TRUE" : "",
-    profile.awards?.allConference   ? "TRUE" : "",
-    profile.awards?.allState        ? "TRUE" : "",
-    "pending",
-    pendingToken,
-    pendingExpiry,
-  ]);
+    // Create production tab if it doesn't exist (test tab creation is handled
+    // by getOrCreateRecruitTestSheet above)
+    if (!sheet) {
+      sheet = ss.insertSheet(RECRUITS_TAB_NAME);
+      sheet.appendRow(RECRUITS_HEADERS);
+    }
 
+    said          = generateSAID(sheet);
+    pendingToken  = Utilities.getUuid();
+    pendingExpiry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+
+    sheet.appendRow([
+      said,
+      new Date().toISOString(),
+      profile.name || "",
+      profile.highSchool || "",
+      profile.gradYear || "",
+      profile.state || "",
+      profile.email || "",
+      profile.phone || "",
+      profile.twitter || "",
+      profile.position || "",
+      profile.height || "",
+      profile.weight || "",
+      profile.speed40 || "",
+      profile.gpa || "",
+      profile.sat || "",
+      profile.hsLat || "",
+      profile.hsLng || "",
+      profile.agi || "",
+      profile.dependents || "",
+      profile.awards?.expectedStarter ? "TRUE" : "",
+      profile.awards?.captain         ? "TRUE" : "",
+      profile.awards?.allConference   ? "TRUE" : "",
+      profile.awards?.allState        ? "TRUE" : "",
+      "pending",
+      pendingToken,
+      pendingExpiry,
+    ]);
+  } finally {
+    lock.releaseLock();
+  }
+
+  // Email is sent outside the lock — MailApp is slow and does not need
+  // to block concurrent SAID generation. Skip email in test mode.
   let emailError = null;
-  try { if (profile.email && profile.name) sendPendingAccountEmail(said, profile.name, profile.email, pendingToken); } catch(e) { emailError = e.message; }
+  if (!isTest) {
+    try {
+      if (profile.email && profile.name) {
+        sendPendingAccountEmail(said, profile.name, profile.email, pendingToken);
+      }
+    } catch(e) {
+      emailError = e.message;
+    }
+  }
 
-  return { ok: true, said, pendingToken, emailError };
+  return { ok: true, said, pendingToken, emailError, testMode: isTest || undefined };
 }
 
 function updateRecruit(profile) {
@@ -752,6 +816,50 @@ function sendPendingAccountEmail(said, name, email, token) {
     name: "GrittyOS",
     body: "Hi " + (name || "there") + ",\n\nYour GRIT Fit profile (" + said + ") has been created.\n\nSet your password to access your results and short list:\n\n" + link + "\n\nThis link expires in 7 days. If you did not submit this profile, please ignore this email.\n\nStay Gritty,\nThe GrittyOS Team\nverifygrit@gmail.com",
   });
+}
+
+// ── DIAGNOSTIC ENDPOINTS ────────────────────────────────────────────────────────
+
+// ?action=version — returns the current deployment version and date.
+// Consumed by Dexter and Sentinel health checks to confirm a deploy is live.
+// Version and date must be bumped manually in the CONFIGURATION block above
+// on every deployment.
+function getVersion() {
+  return { version: GRIT_VERSION, deployed: GRIT_DEPLOYED };
+}
+
+// ?action=getSAIDStats — returns SAID integrity data from the production
+// Recruits tab (not Recruits_Test). Consumed by Dexter and Sentinel.
+// Returns:
+//   total    — number of data rows (excludes header)
+//   lastSAID — value in col A of the last data row, or null if empty
+//   hasDuplicates — true if any SAID value appears more than once
+//   duplicates    — array of {said, count} objects; empty array if clean
+function getSAIDStats() {
+  const ss    = SpreadsheetApp.openById(GRITTY_DB_SHEET_ID);
+  const sheet = ss.getSheetByName(RECRUITS_TAB_NAME);
+  if (!sheet || sheet.getLastRow() <= 1) {
+    return { total: 0, lastSAID: null, hasDuplicates: false, duplicates: [] };
+  }
+
+  const lastRow = sheet.getLastRow();
+  const saids   = sheet.getRange(2, 1, lastRow - 1, 1).getValues().map(r => String(r[0]).trim()).filter(v => v);
+
+  const lastSAID = saids.length > 0 ? saids[saids.length - 1] : null;
+
+  // Count occurrences of each SAID
+  const counts = {};
+  saids.forEach(s => { counts[s] = (counts[s] || 0) + 1; });
+  const duplicates = Object.entries(counts)
+    .filter(([, count]) => count > 1)
+    .map(([said, count]) => ({ said, count }));
+
+  return {
+    total: saids.length,
+    lastSAID,
+    hasDuplicates: duplicates.length > 0,
+    duplicates,
+  };
 }
 
 // ── HELPERS ────────────────────────────────────────────────────────────────────
