@@ -4,6 +4,7 @@ dotenvConfig({ path: '.env.test' });
 
 export default defineConfig({
   testDir: './tests',
+  testMatch: '*.spec.js',
   timeout: 90000,
   retries: 1,
   webServer: {

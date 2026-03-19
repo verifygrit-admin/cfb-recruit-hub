@@ -9,9 +9,9 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "playwright test",
-    "test:unit": "vitest run",
-    "test:unit:watch": "vitest",
-    "test:unit:coverage": "vitest run --coverage",
+    "test:unit": "vitest run --config vitest.config.mjs",
+    "test:unit:watch": "vitest --config vitest.config.mjs",
+    "test:unit:coverage": "vitest run --config vitest.config.mjs --coverage",
     "test:headed": "playwright test --headed",
     "test:report": "playwright show-report",
     "prepare": "husky"
