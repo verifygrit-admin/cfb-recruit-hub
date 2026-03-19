@@ -1,0 +1,80 @@
+name: Sentinel — Platform Integrity Checks
+
+on:
+  schedule:
+    - cron: '0 12 * * *'  # Daily at noon UTC
+  workflow_dispatch:  # Manual trigger
+
+jobs:
+  integrity:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Frontend liveness check
+        run: |
+          echo "## Sentinel Report — $(date -u +%Y-%m-%d)" >> $GITHUB_STEP_SUMMARY
+
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://verifygrit-admin.github.io/cfb-recruit-hub/)
+          if [ "$HTTP_STATUS" -eq 200 ]; then
+            echo "✅ Frontend: HTTP $HTTP_STATUS" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ Frontend: HTTP $HTTP_STATUS — SITE DOWN" >> $GITHUB_STEP_SUMMARY
+            echo "FRONTEND_FAILED=true" >> $GITHUB_ENV
+          fi
+
+      - name: API liveness + school count check
+        run: |
+          API_RESPONSE=$(curl -s "$VITE_API_BASE?action=db")
+
+          if echo "$API_RESPONSE" | grep -q '"schools"'; then
+            SCHOOL_COUNT=$(echo "$API_RESPONSE" | grep -o '"unitid"' | wc -l)
+            if [ "$SCHOOL_COUNT" -ge 600 ]; then
+              echo "✅ API: $SCHOOL_COUNT schools returned" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "⚠️ API: Only $SCHOOL_COUNT schools (expected 661)" >> $GITHUB_STEP_SUMMARY
+              echo "SCHOOL_COUNT_LOW=true" >> $GITHUB_ENV
+            fi
+          else
+            echo "❌ API: No schools array — endpoint unreachable or misconfigured" >> $GITHUB_STEP_SUMMARY
+            echo "API_FAILED=true" >> $GITHUB_ENV
+          fi
+        env:
+          VITE_API_BASE: ${{ secrets.VITE_API_BASE }}
+
+      - name: VITE_API_BASE staleness probe
+        run: |
+          # Fetch the live site and check if the baked-in API URL responds
+          LIVE_RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" "$VITE_API_BASE?action=db")
+          if [ "$LIVE_RESPONSE" -eq 200 ]; then
+            echo "✅ VITE_API_BASE: responds 200 — not stale" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ VITE_API_BASE: HTTP $LIVE_RESPONSE — STALE OR DEAD" >> $GITHUB_STEP_SUMMARY
+            echo "VITE_STALE=true" >> $GITHUB_ENV
+          fi
+        env:
+          VITE_API_BASE: ${{ secrets.VITE_API_BASE }}
+
+      - name: Create issue on failure
+        if: env.FRONTEND_FAILED == 'true' || env.API_FAILED == 'true' || env.VITE_STALE == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const title = `🚨 Sentinel Alert — ${new Date().toISOString().split('T')[0]}`;
+            const body = [
+              '## Sentinel Integrity Check Failed',
+              '',
+              `- Frontend: ${process.env.FRONTEND_FAILED ? '❌ DOWN' : '✅ OK'}`,
+              `- API: ${process.env.API_FAILED ? '❌ UNREACHABLE' : '✅ OK'}`,
+              `- VITE_API_BASE: ${process.env.VITE_STALE ? '❌ STALE' : '✅ OK'}`,
+              '',
+              'Triggered by scheduled Sentinel workflow.',
+              'cc @verifygrit-admin'
+            ].join('\n');
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title,
+              body,
+              labels: ['sentinel', 'automated']
+            });

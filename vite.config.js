@@ -5,4 +5,9 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   base: '/cfb-recruit-hub/',
+  test: {
+    globals: true,
+    environment: 'node',
+    include: ['tests/unit/**/*.test.js'],
+  },
 })

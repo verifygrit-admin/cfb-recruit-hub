@@ -1,0 +1,65 @@
+name: Playwright Regression Tests
+
+on:
+  workflow_run:
+    workflows: ["Deploy to GitHub Pages"]
+    types: [completed]
+
+jobs:
+  test:
+    if: github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Run Playwright regression suite
+        run: npm test
+        env:
+          CI: true
+          VITE_API_BASE: ${{ secrets.VITE_API_BASE }}
+          TEST_EMAIL: ${{ secrets.TEST_EMAIL }}
+          TEST_PASSWORD: ${{ secrets.TEST_PASSWORD }}
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 14
+
+      - name: Post-deploy smoke test
+        run: |
+          echo "## Post-Deploy Smoke Test" >> $GITHUB_STEP_SUMMARY
+
+          # Frontend 200 check
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://verifygrit-admin.github.io/cfb-recruit-hub/)
+          if [ "$HTTP_STATUS" -eq 200 ]; then
+            echo "✅ Frontend: HTTP $HTTP_STATUS" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ Frontend: HTTP $HTTP_STATUS" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
+
+          # API liveness check
+          API_RESPONSE=$(curl -s "$VITE_API_BASE?action=db" | head -c 200)
+          if echo "$API_RESPONSE" | grep -q '"schools"'; then
+            echo "✅ API: schools array present" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ API: schools array missing or endpoint unreachable" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
+
+          echo "✅ Smoke test passed" >> $GITHUB_STEP_SUMMARY
+        env:
+          VITE_API_BASE: ${{ secrets.VITE_API_BASE }}
