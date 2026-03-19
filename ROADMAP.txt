@@ -1,116 +1,589 @@
-CFB RECRUIT HUB — ROADMAP & NEXT STEPS
-=======================================
-Last updated: 2026-03-13 (Hudl import note added to Coaches View)
+CFB-RECRUIT-HUB — STAGE 2 ROADMAP
+===================================
+Last updated: 2026-03-19
+Maintained by: Scout (Chief of Staff)
+Filed by: Scribe on Scout's instruction
+Cross-ref:
+  Gate 8 decisions:  _org\decisions\cfb-recruit-hub\2026-03-19_gate8_supabase_migration_decisions.txt
+  Gate 7 spec:       _org\specs\cfb-recruit-hub\2026-03-19_spec_supabase-migration_gate7.txt
+  Code.gs gate:      _org\decisions\cfb-recruit-hub\2026-03-19_decision_code-gs-retirement-gate_DEC-CFB-008.txt
+  Backlog:           C:\Users\chris\dev\cfb-recruit-hub\BACKLOG.txt
 
+NOTE FOR ANY AGENT PICKING UP COLD
+Before opening a build session, read this document in full.
+If anything here conflicts with the Gate 7 spec or Gate 8 decision
+record, this document takes precedence on sequencing. The Gate 8
+decision record takes precedence on any individual decision.
+Escalate ambiguity to Scout before building — not after.
 
-STEP 1 — URL-BASED ROUTING (do first, before adding more modules)
-------------------------------------------------------------------
-Replace the current single-page view-state system with proper client-side routing
-so each module has its own URL path. This is foundational — every new module
-added after this will have a clean, trackable URL from day one.
+================================================================
+SECTION 1 — WHAT IS DONE
+================================================================
 
-Current views to map to routes:
-  /                    → Home (Map View)
-  /my-grit-fit         → My GRIT Fit results (map + table)
-  /profile             → Student-Athlete Profile form (new/logged-out entry)
-  /short-list          → My Short List
-  /settings            → Settings / Profile (logged-in edit)
+STAGE 1: CLOSED (DEC-GLOBAL-018, 2026-03-19)
+All Stage 1 gates complete. v2.0.0 tagged on commit db0e70e.
 
-Recommended library: React Router v6 (react-router-dom)
+STAGE 2 PRE-CONDITIONS
+  PC-1  Region (us-east-1)                    CLOSED
+  PC-2  Column headers (David export)         CLOSED
+  PC-3  Resend account + sender domain        CLOSED
+        (noreply@grittyfb.com verified)
+        API key: re_3PhfNzAJ_MDLAi8a9Pc5B7CJEH2HAqZMo
+        NOTE: This key is referenced in decision docs only.
+        It must be stored as a Supabase secret — not in code,
+        not in GitHub secrets.
+  PC-4  auth_said() metadata shape verified   CLOSED
 
-Notes:
-- GitHub Pages requires a 404.html redirect hack for client-side routing
-  (copy index.html to 404.html, or use HashRouter as a simpler alternative)
-- Once on a real domain with a proper server/CDN, use BrowserRouter with
-  server-side fallback config instead
+SCHEMA FOUNDATION (all 4 migration files written and applied)
+  Migration files path: supabase/migrations/
+    20260319000001_create_schools.sql
+    20260319000002_create_auth_said.sql
+    20260319000003_create_profiles.sql
+    20260319000004_create_short_list_items.sql
 
+  Step 1: schools table
+    38 columns. Verified against live Sheet column headers (David).
+    RLS: public SELECT (anon key), DENY ALL writes.
+    Status: COMPLETE
 
-STEP 2 — NEW MODULES (add after routing is in place)
------------------------------------------------------
-Each module = new route + new component + any new Apps Script actions needed.
+  Step 2: profiles table
+    31 columns. Verified against Code.gs RECRUITS_HEADERS.
+    RLS: owner-only SELECT/INSERT/UPDATE (auth_said() match),
+    DENY DELETE.
+    Status: COMPLETE
 
-(1) Pre-Offer Tracker          /tracker
-    - Log school interest: contacted, visited, offered, committed
-    - Status pipeline per school (kanban-style or table)
-    - Tie to existing short list
+  Step 3: auth_said() function
+    Postgres function. Extracts SAID from JWT user_metadata.
+    Deployed and verified.
+    Status: COMPLETE
 
-(2) Recruiting Scoreboard      /scoreboard
-    - Leaderboard-style view of the athlete's GRIT scores vs. position averages
-    - Show percentile rankings, trend over time as profile is updated
-    - May require storing score history in the DB
+  Step 4: SAID sequence + generate_said() trigger
+    said_counter Postgres sequence. Trigger fires on profiles INSERT.
+    Atomic — no LockService needed.
+    Deployed and verified.
+    Status: COMPLETE
 
-(3) Recruiting Events          /events
-    - Calendar/list of camps, combines, showcases
-    - Filter by region, date, division
-    - Link to existing camp URLs from GrittyOS DB (Prospect Camp Link column)
+  Step 5: short_list_items table
+    23 columns. Verified against Code.gs saveShortList() shape.
+    Flat table design (DEC-CFB-003). One row per athlete-school pair.
+    RLS: owner-only full CRUD including DELETE (saveShortList pattern).
+    Status: COMPLETE
 
-(4) Document Library           /documents
-    - Upload/store: transcripts, highlight film links, letters, physicals
-    - Could use Google Drive API via Apps Script for storage
-    - Display as a list with download/share links
+TRANSLATION LAYER (partial)
+  src/lib/api.js — COLUMN_MAP and transformSchoolRow() written.
+  Not yet wired. Wires at Step 6 (api.js full rewrite).
+  Status: WRITTEN, NOT WIRED
 
-(5) API Connections            /connections
-    - Hudl: link highlight film directly from Hudl account
-    - Twitter/X: connect handle for auto-pull of recruiting tweet activity
-    - Future: On3, 247Sports, Rivals profile links
+GOVERNANCE DECISIONS MADE (all locked, do not re-open without Scout)
+  DEC-CFB-003   Short list storage: flat table (Option A)
+  DEC-CFB-004   Email provider: Resend + Edge Functions
+  DEC-CFB-005   Password migration: force reset
+  DEC-CFB-006   Supabase region: us-east-1
+  DEC-CFB-007   RLS policy set (full design, implemented)
+  DEC-CFB-008   Code.gs retirement gate: Morty PASS + Dexter POST-DEPLOY PASS
+  DEC-GLOBAL-019 + PROTO-GLOBAL-009   Voice integrity
+  PROTO-GLOBAL-010   Data source verification (verified-against-live required)
 
-(6) Coaches View               /coaches
-    - Separate login role: "coach" vs "athlete"
-    - Dropdown to switch between active and graduated athletes from same HS
-    - See all profiles, short lists, scores for their athletes
-    - Requires role field in Auth tab + coach-to-athlete relationship in DB
-    - HUDL IMPORT: allow coaches to bulk-create athlete profiles via two paths:
-        Option A — CSV drop-in:
-          - Coach downloads athlete roster/profile export from Hudl
-          - Drops CSV file into the app via a drag-and-drop or file picker UI
-          - App parses CSV, maps Hudl columns to our DB fields (name, position,
-            grad year, height, weight, HS, email, Hudl profile URL, etc.)
-          - Coach reviews a preview table, edits any mismatches, then confirms
-          - Bulk saveRecruit calls create accounts for each athlete in the DB
-          - Athletes receive setup email to create their own password
-        Option B — Hudl API (if API access is available):
-          - Coach authenticates via Hudl OAuth from within the app
-          - App pulls team roster directly from Hudl API
-          - Same preview/confirm/bulk-create flow as CSV path
-          - Hudl highlight film URL auto-populated in each athlete's profile
-        Notes:
-          - Hudl's public API access is limited; CSV path is the reliable fallback
-          - Column mapping may need a manual-override UI if Hudl changes export format
-          - Duplicate detection needed: check existing email/SAID before creating
+PROTOCOLS
+  PROTO-GLOBAL-010: all schema columns verified against live data source
+  before migration file is written. This protocol applies to any future
+  schema additions in Stage 2.
 
+INFRASTRUCTURE
+  Supabase CLI: authenticated, linked, working.
+  Auth pattern: export SUPABASE_DB_PASSWORD before CLI operations.
+  Supabase Auth (GoTrue): provisioned. JWTs govern session validity.
 
-STEP 3 — DOMAIN + PRODUCTION DEPLOYMENT
------------------------------------------
-Move off GitHub Pages to a real domain and production-grade hosting.
-This is the most important step for making it a real CRM product.
+================================================================
+SECTION 2 — ACTIVE BUILD SEQUENCE
+================================================================
 
-Tasks:
-  a) Register a domain (e.g. gritfit.app, recruitgrit.com, etc.)
-  b) Choose hosting — options:
-       - Vercel or Netlify: easiest, free tier, handles SPA routing natively,
-         supports custom domains + SSL, CI/CD on git push
-       - Cloudflare Pages: similar, excellent CDN, very fast
-       - AWS Amplify / GCP Firebase Hosting: more control, more setup
-     Recommendation: Vercel or Netlify to start — zero config, instant deploys
-  c) Point DNS to host, configure SSL (auto on Vercel/Netlify)
-  d) Move VITE_API_BASE and any secrets to host's environment variable settings
-     (not in .env committed to repo)
-  e) Consider migrating backend off Apps Script to a proper API as scale grows:
-       - Apps Script has rate limits (20k requests/day on free Workspace)
-       - Options: Supabase (Postgres + auth), PlanetScale, Firebase, or a
-         lightweight Node/Express API on Railway or Fly.io
-  f) Mobile: once on a real domain, wrap in a PWA (Progressive Web App)
-       - Add manifest.json + service worker → "Add to Home Screen" on iOS/Android
-       - No App Store submission required for initial mobile support
-       - True native app (React Native or Capacitor) is a later-stage option
+The build sequence is Steps 6 through 10. Steps 1-5 (schema) are done.
+Do not reorder steps. Dependencies are stated explicitly for each step.
 
+----------------------------------------------------------------
+SEEDING PIPELINE — REQUIRED BEFORE STEP 6 CAN BEGIN
+----------------------------------------------------------------
 
-CURRENT TECH STACK (reference)
---------------------------------
-Frontend : React + Vite, Leaflet + leaflet.markercluster
-Backend  : Google Apps Script Web App (Code.gs)
-Database : Google Sheets (GrittyOS DB — Sheet ID in Code.gs)
-Auth     : Custom session tokens stored in Auth tab
-Hosting  : GitHub Pages (gh-pages branch)
-Deploy   : npm run build && npx gh-pages -d dist (frontend)
-           Apps Script manual redeploy in editor (backend)
+The schools table exists but has no data. Step 6 cannot be
+tested without data. The seeding pipeline is the immediate
+blocker for all downstream work.
+
+SEEDING STEP A — Google service account setup
+Owner: Chris (action required)
+Status: BLOCKED ON CHRIS
+  Six steps Patch provided in prior session:
+  1. Go to Google Cloud Console → create or select a project
+  2. Enable Google Sheets API for the project
+  3. Create a service account (IAM → Service Accounts → Create)
+  4. Download the JSON key file for the service account
+  5. Share the GrittyOS DB Google Sheet with the service account
+     email address (viewer access is sufficient for read-only sync)
+  6. Place the JSON key file at a path accessible to sync_schools.py
+     (do NOT commit this file — add to .gitignore)
+  Chris must complete this before Patch can build sync_schools.py
+  end-to-end.
+
+SEEDING STEP B — Data fixes in Google Sheet
+Owner: Chris (action required)
+Status: BLOCKED ON CHRIS
+  Four specific issues found by David during PC-2:
+  (a) Bryant University: add UNITID 217156 + IPEDS fields (missing)
+  (b) Commonwealth U of PA: remove 1 duplicate row
+  (c) PA Western U: remove 2 duplicate rows
+  (d) Notre Dame, UConn, UMass-Amherst: Type field is blank — Chris
+      to fill in correct division type for each school
+  These fixes must be applied before sync_schools.py is run.
+  Running sync with dirty data would seed incorrect records
+  into the schools table (PROTO-GLOBAL-010 applies).
+
+SEEDING STEP C — Build sync_schools.py
+Owner: Patch (primary)
+Status: NOT YET BUILT
+Depends on: Seeding Steps A and B both complete
+  Script reads GrittyOS DB Sheet via gspread (Google service account).
+  Maps sheet columns to schools table columns using the same
+  COLUMN_MAP pattern already written in api.js.
+  Inserts into schools table via Supabase Python client.
+  Idempotent: upsert on UNITID to support future IPEDS re-sync.
+  Option A (approved): gspread + Supabase Python client.
+
+SEEDING STEP D — Run sync_schools.py
+Owner: Patch (executes), David (verifies)
+Status: BLOCKED (depends on A, B, C)
+  David acceptance criteria:
+  - Row count matches GrittyOS DB (661 schools)
+  - UNITID uniqueness confirmed (no duplicates)
+  - Spot-check: 5 rows verified column-by-column against Sheet
+
+----------------------------------------------------------------
+STEP 6 — api.js FULL REWRITE (17 functions to Supabase)
+----------------------------------------------------------------
+
+Owner: Patch (primary), Nova (executes)
+Status: BLOCKED on seeding pipeline
+Depends on: Seeding Steps A-D complete (need live data to test against)
+This is the largest single step. Every frontend data function gets
+rewired. No function signatures change. No caller file changes.
+All camelCase-to-snake_case mapping lives in api.js only.
+
+17 functions to rewrite (inventory in Gate 7 spec, Item 1):
+  getSchools()            — SELECT from schools table
+  getSchoolByUnitid()     — SELECT single school by unitid
+  checkEmail()            — SELECT from profiles (status field)
+  createAccount()         — supabase.auth.signUp + INSERT profiles
+  login()                 — supabase.auth.signInWithPassword
+  logout()                — supabase.auth.signOut
+  getRecruit()            — SELECT from profiles WHERE said = auth_said()
+  saveRecruit()           — UPSERT profiles + trigger send-pending-account
+  updateRecruit()         — UPDATE profiles WHERE said = auth_said()
+  getShortList()          — SELECT from short_list_items WHERE said = auth_said()
+  saveShortList()         — DELETE + INSERT short_list_items (owner scope)
+  forgotPassword()        — supabase.auth.resetPasswordForEmail
+  resetPassword()         — supabase.auth.updateUser
+  requestEmailChangeMagicLink() — invoke send-email-change Edge Function
+  confirmEmailChangeMagicLink() — supabase.auth.updateUser (email)
+  resendSetupEmail()      — invoke send-pending-account Edge Function (resend flag)
+  getSAIDStats()          — SELECT COUNT from profiles (service role key)
+
+PRE-STEP-6 FLAGS (resolve before first build session opens)
+  FLAG 1 (HIGH) — SAID metadata shape in auth_said() [PC-4 CLOSED]
+    PC-4 is marked CLOSED, meaning the test signUp was run and
+    auth_said() confirmed working. Patch verifies this is documented
+    before writing api.js auth-dependent functions.
+  FLAG 2 (MEDIUM) — saveShortList() DELETE scope
+    Patch must confirm: RLS DELETE policy on short_list_items
+    correctly scopes to authenticated user's rows only.
+    A malformed DELETE without WHERE must be rejected by RLS,
+    not silently accepted. Verify before writing saveShortList().
+
+DONE CONDITION — Step 6
+  All 17 functions rewritten and returning correct shapes.
+  Quin confirms return shapes match prior api.js surface
+  (no caller changes required).
+  Seeding data available for end-to-end manual test.
+
+----------------------------------------------------------------
+STEP 7 — EDGE FUNCTIONS (Resend email integration)
+----------------------------------------------------------------
+
+Owner: Patch (primary), Nova (executes)
+Status: CAN BEGIN IN PARALLEL WITH STEP 6 (does not depend on seeding)
+Depends on: Supabase project wired, RESEND_API_KEY stored as secret
+Note: Resend account is open (PC-3 CLOSED). API key is confirmed.
+
+Four Edge Functions to deploy (TypeScript / Deno runtime):
+  supabase/functions/send-pending-account/index.ts
+    Trigger: saveRecruit() when profile.email is present
+    Payload: { said, name, email, token }
+    Sends: completeSAID link with pendingToken, 24h expiry
+
+  supabase/functions/send-password-reset/index.ts
+    Trigger: forgotPassword(email)
+    Current GAS: 6-digit code pattern
+    Stage 2: Supabase recovery token via redirect URL
+    Sends: standard Supabase-style reset link via Resend
+
+  supabase/functions/send-email-change/index.ts
+    Trigger: requestEmailChangeMagicLink()
+    Payload: { email, magicLink }
+    Sends: magic link, 24h expiry
+
+  supabase/functions/send-resend-setup/index.ts (or resend flag on send-pending-account)
+    Trigger: resendSetupEmail()
+    Sends: same completeSAID link, new token
+
+Config: RESEND_API_KEY stored as Supabase secret only.
+Sender domain: noreply@grittyfb.com (verified, PC-3 CLOSED).
+
+DONE CONDITION — Step 7
+  All 4 Edge Functions deploy without error.
+  Manual end-to-end test: trigger each function, confirm email
+  arrives from noreply@grittyfb.com with correct content.
+
+----------------------------------------------------------------
+STEP 8 — TEST_MODE ROUTING
+----------------------------------------------------------------
+
+Owner: Patch (primary), Quin (test verification)
+Status: NOT YET STARTED
+Depends on: Step 6 complete (api.js must be rewritten first)
+
+  Create profiles_test companion table (mirrors profiles schema).
+  api.js detects testMode=true in request context and routes
+  all profile reads/writes to profiles_test instead of profiles.
+  Verify Playwright CI passes with testMode=true payloads.
+  No Playwright test file changes required.
+
+DONE CONDITION — Step 8
+  Playwright regression suite (4 tests) passes against
+  Supabase backend with testMode=true.
+  Quin confirms no test file changes were required.
+
+----------------------------------------------------------------
+STEP 9 — CREDENTIALS + GITHUB SECRETS ROTATION (Dexter owns)
+----------------------------------------------------------------
+
+Owner: Dexter (primary), Patch (executes secret rotation)
+Status: NOT YET STARTED
+Depends on: Steps 6, 7, 8 all complete
+
+Actions:
+  Retire VITE_API_BASE GitHub secret (post-rotation only)
+  Add VITE_SUPABASE_URL GitHub secret
+  Add VITE_SUPABASE_ANON_KEY GitHub secret
+  Note: SUPABASE_DB_PASSWORD is already set as a GitHub secret.
+
+Commands (Patch executes):
+  gh secret set VITE_SUPABASE_URL --repo verifygrit-admin/cfb-recruit-hub --body "..."
+  gh secret set VITE_SUPABASE_ANON_KEY --repo verifygrit-admin/cfb-recruit-hub --body "..."
+
+After rotation: push empty commit to trigger frontend rebuild.
+Dexter confirms CI green post-rebuild.
+
+PUSH CHECK APPLIES: This step triggers a frontend rebuild.
+[PUSH CHECK] is required before the empty commit is pushed.
+
+DONE CONDITION — Step 9
+  CI green. Frontend loads against Supabase endpoint.
+  Dexter confirms VITE_API_BASE is retired (no longer needed).
+
+----------------------------------------------------------------
+STEP 10 — VALIDATION (three parallel tracks)
+----------------------------------------------------------------
+
+Owner: Scout (orchestrates three tracks)
+Status: NOT YET STARTED
+Depends on: Steps 6-9 all complete
+This is the final gate before Code.gs retirement (DEC-CFB-008).
+
+TRACK A — Quin: Playwright flows 1-5 + checkEmail() test
+  Run all 5 testing flows against live Supabase backend.
+  FLAG 3 (LOW) must be closed first: Quin adds checkEmail()
+  response shape Vitest test before Playwright runs begin.
+  checkEmail() must return { hasAccount: bool, pendingAccount?: bool }
+  — shape preserved from Code.gs implementation.
+  Dexter confirms PASS after Playwright suite is green.
+
+TRACK B — Morty: RLS audit
+  Morty audits all final RLS policies on schools, profiles,
+  short_list_items before Stage 2 launch.
+  This is Condition 1 of DEC-CFB-008 (Code.gs retirement gate).
+  Morty must issue formal PASS. No retirement without it.
+
+TRACK C — Patch: Force reset (password migration)
+  Execute DEC-CFB-005 force reset for all existing users.
+  Fewer than 20 accounts. Personal email from Chris to each user.
+  Steps:
+    1. Export all Auth tab rows (email + SAID — do NOT export hashes)
+    2. For each user: supabase.auth.admin.createUser() with random temp password
+    3. Immediately trigger Resend password reset email to that user
+    4. User clicks link, sets new bcrypt password via GoTrue
+    5. Legacy Auth tab retired. No SHA-256 code in any Stage 2 file.
+  Chris sends the personal communication email explaining the
+  security upgrade.
+
+DONE CONDITION — Step 10 (all three tracks must clear)
+  Track A: Dexter issues formal POST-DEPLOY PASS (Playwright green)
+  Track B: Morty issues formal RLS PASS
+  Track C: All existing users have completed force reset
+
+CODE.GS RETIREMENT (DEC-CFB-008)
+  After both DEC-CFB-008 conditions clear (Morty PASS + Dexter POST-DEPLOY PASS):
+  Patch archives .clasp.json with retirement date noted.
+  Code.gs marked RETIRED in CHANGELOG.
+  GAS deployment is NOT deleted — archived.
+  Scout authorizes retirement explicitly before Patch executes.
+
+================================================================
+SECTION 3 — BLOCKED ON CHRIS
+================================================================
+
+These items cannot move until Chris takes action. Both are
+blocking the seeding pipeline, which blocks Step 6.
+
+1. GOOGLE SERVICE ACCOUNT SETUP
+   What: Create service account in Google Cloud Console,
+         download JSON key, share GrittyOS DB Sheet with
+         service account email.
+   Why needed: sync_schools.py cannot authenticate to Google Sheets
+               without a service account. gspread requires it.
+   Blocked since: schema foundation session (2026-03-19 this session)
+   Unblocks: Seeding Step C (sync_schools.py build), Seeding Step D
+
+2. GOOGLE SHEET DATA FIXES
+   What: Four specific corrections to the GrittyOS DB Sheet:
+     (a) Bryant University: add UNITID 217156 + IPEDS fields
+     (b) Commonwealth U of PA: remove 1 duplicate row
+     (c) PA Western U: remove 2 duplicate rows
+     (d) Notre Dame, UConn, UMass-Amherst: fill in Type field
+   Why needed: seeding dirty data would violate PROTO-GLOBAL-010.
+               David cannot issue acceptance PASS on a dirty seed.
+   Blocked since: PC-2 session
+   Unblocks: Seeding Step D (run sync_schools.py)
+
+================================================================
+SECTION 4 — OVERDUE ITEMS
+================================================================
+
+These were assigned at the All-Hands (2026-03-19) and have
+not been delivered. Both are needed before Step 6 opens.
+
+D2 — Rio: Version milestone structure proposal
+  Assigned: All-Hands meeting, 2026-03-19
+  Status: NOT DELIVERED
+  What: Rio to propose how Stage 2 milestones should be versioned
+        (e.g., v2.0.x hotfixes during migration, v2.1.0 post-
+        migration stable, etc.)
+  Why needed: Patch and Scout need a version convention before
+              the first Step 6 commit is made.
+  Action: Rio delivers proposal to Scout at next session open.
+  Priority: HIGH — needed before Step 6 first commit.
+
+D3 — Quin: api.js return-shape test coverage plan (QA-SPEC-001)
+  Assigned: All-Hands meeting, 2026-03-19
+  Status: DRAFTED, NOT WRITTEN
+  What: Quin's schema verification tests for api.js return shapes.
+        Tests are drafted in QA-SPEC-001 but not written as
+        Vitest test files.
+  Why needed: These tests gate Step 6. api.js cannot be declared
+              done without return-shape test coverage.
+  Action: Quin writes tests from QA-SPEC-001 spec at next session.
+  Priority: HIGH — gates Step 6 done condition.
+
+================================================================
+SECTION 5 — OPEN FLAGS
+================================================================
+
+These are unresolved technical questions that must be confirmed
+before the flagged build step opens. Do not begin the flagged
+step with an open flag.
+
+FLAG 1 (HIGH) — Patch: SAID metadata shape in auth_said()
+  Gate: blocks Step 6 (api.js rewrite)
+  What: Confirm signUp({ options: { data: { said } } }) metadata
+        shape correctly surfaces in auth.jwt() user_metadata so
+        auth_said() can retrieve it. PC-4 is marked CLOSED, meaning
+        the test was run — Patch documents the confirmed shape
+        before Step 6 api.js auth-dependent functions are written.
+  Owner: Patch
+  Note: If PC-4 CLOSED is accurate, this flag may close automatically.
+        Patch confirms at next session start.
+
+FLAG 2 (MEDIUM) — Patch: saveShortList() DELETE scope
+  Gate: blocks saveShortList() rewrite within Step 6
+  What: RLS DELETE policy on short_list_items must reject a
+        DELETE without WHERE clause (must be scoped to auth_said()
+        rows only). Patch verifies with a test DELETE before
+        writing the saveShortList() body.
+  Owner: Patch
+
+FLAG 3 (LOW) — Quin: checkEmail() response shape test
+  Gate: must be closed before Playwright runs begin in Step 10
+  What: Vitest unit test for checkEmail() return shape.
+        Must return { hasAccount: bool, pendingAccount?: bool } exactly.
+        The Supabase implementation queries profiles.status —
+        not the Auth tab. Shape preservation is critical (callers
+        depend on it and are not being changed).
+  Owner: Quin
+
+================================================================
+SECTION 6 — BACKLOG (not blocking Stage 2)
+================================================================
+
+Items below are real but not on the critical path.
+None of these should be pulled into Stage 2 without a Scout ruling.
+
+BL-003  BC High image hardcoded in QuickListForm.jsx and SettingsPage.jsx.
+        Flagged by Sage. Keep hardcode for now. Reopen when
+        GrittyOS onboards non-BC-High users. (LOW)
+
+BL-004  Auth tab cols 13-15 missing header labels in getOrCreateAuthSheet().
+        Not a runtime blocker. Tidy-up item for Code.gs. Code.gs is
+        being retired — this may be moot at Stage 2 close. (LOW)
+
+BL-005  CI failures on retroactive tag push (v1.1.2, v1.1.3, v1.1.5).
+        Accepted Known Artifact per DEC-GLOBAL-006-B. Do not re-run
+        or attempt to fix historical workflow runs. (ACCEPTED)
+
+BL-006  updateRecruit() row scan iterates one cell at a time (Code.gs).
+        Performance bottleneck at scale. Fix pattern exists (array
+        getRange then index search). Code.gs being retired — this
+        does not carry into Stage 2 api.js rewrite unless the
+        equivalent pattern is discovered in Supabase implementation.
+        Stage 2 kickoff item if applicable. (MEDIUM)
+
+BL-007  checkEmail() reads 24 columns on every call (Code.gs).
+        Fix: read only email column + status column. Code.gs being
+        retired — same note as BL-006. (MEDIUM)
+
+Option C: scoring.js snake_case refactor — post-Stage-2 stability.
+          Backlogged by explicit decision. Do not pull in during Stage 2.
+
+Acad_rigor derivation methodology — Vault noted, future documentation task.
+
+grittyfb.com → GitHub Pages DNS — near-term, Sage recommended.
+          Sage to own when Chris initiates.
+
+Vercel migration — mid-term, after Supabase is stable. Sage advisory.
+
+Sprite assets (Scout, Quill, Scribe, Vault, Quin, David) — backlog.
+
+Sage advisory review of scoring tests — MEDIUM, backlog.
+
+================================================================
+SECTION 7 — AGENT AUTHORITY MAP (Stage 2)
+================================================================
+
+PATCH   Primary builder for Stage 2.
+        Owns: schema, api.js rewrite, Edge Functions, RLS
+        implementation, sync_schools.py, seeding, credentials
+        rotation, Code.gs retirement execution.
+        Scope: everything in the build sequence above.
+
+NOVA    Executes on Patch's instruction.
+        If Patch is not available, Nova executes with Gate 8
+        decision record and Gate 7 spec as the baseline.
+        Nova does not make architecture decisions — escalates to Scout.
+
+MORTY   Architecture audit of final RLS policies before launch.
+        Read-only during build (no direct schema changes).
+        Owner of DEC-CFB-008 Condition 1 (formal RLS PASS).
+        Also available for spot-checks if Patch surfaces a
+        structural question during Step 6.
+
+QUIN    QA Agent. Owns: FLAG 3 (checkEmail test), QA-SPEC-001
+        test file implementation, D3 (return-shape coverage plan),
+        Playwright test execution for Flows 1-5 in Step 10.
+        Test suite: 4 Playwright tests + 16 Vitest scoring tests.
+        Does not touch api.js directly.
+
+DAVID   Data Steward. Owns: GrittyOS DB integrity, seeding
+        acceptance verification (Seeding Step D), future IPEDS
+        sync via sync_schools.py. David owns the schools table
+        data layer. Does not write code.
+
+DEXTER  CI/CD monitoring. Owns: post-deploy PASS confirmation,
+        CI green verification after secret rotation (Step 9),
+        DEC-CFB-008 Condition 2 (POST-DEPLOY PASS after Step 10).
+        Sentinel.yml and Playwright CI are Dexter's domain.
+
+RIO     Version tagging. Owns: D2 (version milestone structure
+        proposal, overdue). Tags Stage 2 milestones when Scout
+        signals they are closed.
+
+SCOUT   Orchestrator. Does not build. Owns: working team meetings
+        before each step, flag resolution, scope rulings, Code.gs
+        retirement authorization (DEC-CFB-008 both conditions cleared),
+        Step 10 three-track orchestration.
+
+SAGE    Advisor. Available for GTM, architecture second opinion,
+        and Sunday 9 PM EST cadence briefs. Not on the Stage 2
+        critical path. Escalate to Sage for anything touching
+        hosting, domain, or post-Stage-2 commercial positioning.
+
+================================================================
+SECTION 8 — RECOMMENDED NEXT SESSION SEQUENCE
+================================================================
+
+This is the order of operations for the next cold-start session.
+
+BEFORE ANY BUILD WORK OPENS
+  1. Rio delivers D2 (version milestone structure) to Scout.
+     If Rio has not delivered, Scout flags to Chris before proceeding.
+
+  2. Quin delivers QA-SPEC-001 test files (D3).
+     If not done, Quin writes tests before Step 6 opens.
+
+  3. Patch confirms FLAG 1 is closed (PC-4 documented).
+     If any doubt, re-run the test signUp and document the shape.
+
+THEN
+  4. Chris completes Seeding Step A (Google service account).
+     If Chris has not completed this, Patch builds sync_schools.py
+     locally but cannot run it end-to-end.
+
+  5. Chris applies Seeding Step B data fixes to the Sheet.
+     Can be done in parallel with Seeding Step A.
+
+  6. Patch builds sync_schools.py (Seeding Step C).
+     Depends on: Seeding Step A complete.
+
+  7. Seeding Step D: run sync_schools.py, David verifies.
+     Depends on: Steps A, B, C all done.
+
+  8. Open Step 6 (api.js rewrite) — Working Team meeting required.
+     Step 7 (Edge Functions) can open in parallel if a second
+     agent thread is available.
+
+  9. Steps 8, 9, 10 follow in sequence after Step 6 is done.
+
+================================================================
+SECTION 9 — GOVERNANCE REMINDERS
+================================================================
+
+PROTO-GLOBAL-010 (data source verification)
+  All schema columns must be verified against the live data source
+  before any migration file is written. Already applied to all 4
+  migration files. Applies to any future schema changes.
+
+PROTO-GLOBAL-004 (push check)
+  [PUSH CHECK] fires before npm run build and before any deploy
+  operation. Applies to Supabase migrations (push check before
+  supabase db push), GitHub secrets rotation, and the empty commit
+  in Step 9. Scout or Nova surfaces the check — do not skip it.
+
+DEC-CFB-008 (Code.gs retirement gate)
+  Code.gs stays live until BOTH: Morty RLS PASS (Track B, Step 10)
+  AND Dexter POST-DEPLOY PASS (Track A, Step 10).
+  Scout authorizes retirement. Patch executes. No exceptions.
+
+MEETING REQUIREMENT
+  A Working Team meeting (Scout-run, 5-step agenda) is required
+  before each numbered step opens. The meeting is not overhead —
+  it is how scope boundaries and done conditions are confirmed
+  before build begins. Do not open a step without it.
+
+================================================================
+END OF DOCUMENT
+================================================================
