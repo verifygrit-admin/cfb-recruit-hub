@@ -15,7 +15,7 @@ jobs:
         run: |
           echo "## Sentinel Report — $(date -u +%Y-%m-%d)" >> $GITHUB_STEP_SUMMARY
 
-          HTTP_STATUS=$(curl -sL-o /dev/null -w "%{http_code}" https://verifygrit-admin.github.io/cfb-recruit-hub/)
+          HTTP_STATUS=$(curl -sL -o /dev/null -w "%{http_code}" https://verifygrit-admin.github.io/cfb-recruit-hub/)
           if [ "$HTTP_STATUS" -eq 200 ]; then
             echo "✅ Frontend: HTTP $HTTP_STATUS" >> $GITHUB_STEP_SUMMARY
           else
@@ -25,7 +25,7 @@ jobs:
 
       - name: API liveness + school count check
         run: |
-          API_RESPONSE=$(curl -sL"$VITE_API_BASE?action=db")
+          API_RESPONSE=$(curl -sL "$VITE_API_BASE?action=db")
 
           if echo "$API_RESPONSE" | grep -q '"schools"'; then
             SCHOOL_COUNT=$(echo "$API_RESPONSE" | grep -o '"unitid"' | wc -l)
@@ -45,7 +45,7 @@ jobs:
       - name: VITE_API_BASE staleness probe
         run: |
           # Fetch the live site and check if the baked-in API URL responds
-          LIVE_RESPONSE=$(curl -sL-o /dev/null -w "%{http_code}" "$VITE_API_BASE?action=db")
+          LIVE_RESPONSE=$(curl -sL -o /dev/null -w "%{http_code}" "$VITE_API_BASE?action=db")
           if [ "$LIVE_RESPONSE" -eq 200 ]; then
             echo "✅ VITE_API_BASE: responds 200 — not stale" >> $GITHUB_STEP_SUMMARY
           else
@@ -55,8 +55,37 @@ jobs:
         env:
           VITE_API_BASE: ${{ secrets.VITE_API_BASE }}
 
+      - name: SAID stats probe
+        run: |
+          SAID_RESPONSE=$(curl -sL "$VITE_API_BASE?action=getSAIDStats")
+
+          # Check endpoint reachability
+          if ! echo "$SAID_RESPONSE" | grep -q '"total"'; then
+            echo "❌ SAID stats: endpoint unreachable or response malformed" >> $GITHUB_STEP_SUMMARY
+            echo "Response: $SAID_RESPONSE"
+            echo "SAID_STATS_FAILED=true" >> $GITHUB_ENV
+          else
+            # Extract total — must be a number > 0
+            TOTAL=$(echo "$SAID_RESPONSE" | grep -o '"total":[0-9]*' | grep -o '[0-9]*')
+            HAS_DUPES=$(echo "$SAID_RESPONSE" | grep -o '"hasDuplicates":[a-z]*' | grep -o '[a-z]*$')
+
+            if [ "$HAS_DUPES" = "true" ]; then
+              echo "❌ SAID stats: hasDuplicates=true — SAID collision detected" >> $GITHUB_STEP_SUMMARY
+              echo "Response: $SAID_RESPONSE"
+              echo "SAID_STATS_FAILED=true" >> $GITHUB_ENV
+            elif [ -z "$TOTAL" ] || [ "$TOTAL" -le 0 ]; then
+              echo "❌ SAID stats: total is 0 or missing — unexpected empty registry" >> $GITHUB_STEP_SUMMARY
+              echo "Response: $SAID_RESPONSE"
+              echo "SAID_STATS_FAILED=true" >> $GITHUB_ENV
+            else
+              echo "✅ SAID stats: $TOTAL SAIDs registered, no duplicates" >> $GITHUB_STEP_SUMMARY
+            fi
+          fi
+        env:
+          VITE_API_BASE: ${{ secrets.VITE_API_BASE }}
+
       - name: Create issue on failure
-        if: env.FRONTEND_FAILED == 'true' || env.API_FAILED == 'true' || env.VITE_STALE == 'true'
+        if: env.FRONTEND_FAILED == 'true' || env.API_FAILED == 'true' || env.VITE_STALE == 'true' || env.SAID_STATS_FAILED == 'true'
         uses: actions/github-script@v7
         with:
           script: |
@@ -67,6 +96,7 @@ jobs:
               `- Frontend: ${process.env.FRONTEND_FAILED ? '❌ DOWN' : '✅ OK'}`,
               `- API: ${process.env.API_FAILED ? '❌ UNREACHABLE' : '✅ OK'}`,
               `- VITE_API_BASE: ${process.env.VITE_STALE ? '❌ STALE' : '✅ OK'}`,
+              `- SAID stats: ${process.env.SAID_STATS_FAILED ? '❌ COLLISION OR UNREACHABLE' : '✅ OK'}`,
               '',
               'Triggered by scheduled Sentinel workflow.',
               'cc @verifygrit-admin'
