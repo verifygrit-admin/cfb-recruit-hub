@@ -15,7 +15,7 @@ jobs:
         run: |
           echo "## Sentinel Report — $(date -u +%Y-%m-%d)" >> $GITHUB_STEP_SUMMARY
 
-          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://verifygrit-admin.github.io/cfb-recruit-hub/)
+          HTTP_STATUS=$(curl -sL-o /dev/null -w "%{http_code}" https://verifygrit-admin.github.io/cfb-recruit-hub/)
           if [ "$HTTP_STATUS" -eq 200 ]; then
             echo "✅ Frontend: HTTP $HTTP_STATUS" >> $GITHUB_STEP_SUMMARY
           else
@@ -25,7 +25,7 @@ jobs:
 
       - name: API liveness + school count check
         run: |
-          API_RESPONSE=$(curl -s "$VITE_API_BASE?action=db")
+          API_RESPONSE=$(curl -sL"$VITE_API_BASE?action=db")
 
           if echo "$API_RESPONSE" | grep -q '"schools"'; then
             SCHOOL_COUNT=$(echo "$API_RESPONSE" | grep -o '"unitid"' | wc -l)
@@ -45,7 +45,7 @@ jobs:
       - name: VITE_API_BASE staleness probe
         run: |
           # Fetch the live site and check if the baked-in API URL responds
-          LIVE_RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" "$VITE_API_BASE?action=db")
+          LIVE_RESPONSE=$(curl -sL-o /dev/null -w "%{http_code}" "$VITE_API_BASE?action=db")
           if [ "$LIVE_RESPONSE" -eq 200 ]; then
             echo "✅ VITE_API_BASE: responds 200 — not stale" >> $GITHUB_STEP_SUMMARY
           else

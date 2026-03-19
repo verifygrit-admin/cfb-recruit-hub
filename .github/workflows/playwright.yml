@@ -43,7 +43,8 @@ jobs:
           echo "## Post-Deploy Smoke Test" >> $GITHUB_STEP_SUMMARY
 
           # Frontend 200 check
-          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://verifygrit-admin.github.io/cfb-recruit-hub/)
+          HTTP_STATUS=$(curl -sL -o /dev/null -w "%{http_code}" https://verifygrit-admin.github.io/cfb-recruit-hub/)
+          echo "Frontend HTTP status: $HTTP_STATUS"
           if [ "$HTTP_STATUS" -eq 200 ]; then
             echo "✅ Frontend: HTTP $HTTP_STATUS" >> $GITHUB_STEP_SUMMARY
           else
@@ -51,12 +52,14 @@ jobs:
             exit 1
           fi
 
-          # API liveness check
-          API_RESPONSE=$(curl -s "$VITE_API_BASE?action=db" | head -c 200)
+          # API liveness check (follow redirects — GAS uses 302 chain)
+          API_RESPONSE=$(curl -sL "$VITE_API_BASE?action=db" | head -c 500)
+          echo "API response preview: ${API_RESPONSE:0:200}"
           if echo "$API_RESPONSE" | grep -q '"schools"'; then
             echo "✅ API: schools array present" >> $GITHUB_STEP_SUMMARY
           else
             echo "❌ API: schools array missing or endpoint unreachable" >> $GITHUB_STEP_SUMMARY
+            echo "Full response: $API_RESPONSE"
             exit 1
           fi
 
