@@ -16,6 +16,70 @@ function post(action, body = {}) {
   });
 }
 
+// ── Supabase → Sheet-style key translation ────────────────────────────────────
+// Used when fetchSchools() is rewritten to hit Supabase in Step 6.
+// Array values mean "set BOTH keys on the output object" — scoring.js uses
+// dual-fallback patterns (e.g. row['School Name'] || row['School_Name']).
+export const COLUMN_MAP = {
+  unitid:                      'UNITID',
+  school_name:                 ['School Name', 'School_Name'],
+  state:                       'State',
+  city:                        'City/Location',
+  control:                     'Control',
+  school_type:                 'School Type',
+  type:                        'Type',
+  ncaa_division:               ['NCAA Division', 'NCAA_Division'],
+  conference:                  'Conference',
+  latitude:                    ['LATITUDE', 'Lat'],
+  longitude:                   ['LONGITUDE', 'Lng'],
+  admissions_rate:             'Admissions Rate',
+  coa_out_of_state:            ['COA (Out-of-State)', 'COA'],
+  est_avg_merit:               'Est_Avg_Merit',
+  avg_merit_award:             'Avg Merit Award',
+  share_stu_any_aid:           'Share_Stu_Any_Aid',
+  share_stu_need_aid:          'Share_Stu_Need_Aid',
+  need_blind_school:           'Need-Blind School',
+  dltv:                        'DLTV',
+  adltv:                       'ADLTV',
+  adltv_rank:                  'ADLTV Rank',
+  graduation_rate:             ['Graduation Rate', 'Grad_Rate'],
+  is_test_optional:            'Is_Test_Optional',
+  acad_rigor_senior:           'Acad_Rigor_Senior',
+  acad_rigor_junior:           'Acad_Rigor_Junior',
+  acad_rigor_soph:             'Acad_Rigor_Soph',
+  acad_rigor_freshman:         'Acad_Rigor_Freshman',
+  acad_rigor_test_opt_senior:  'Acad_Rigor_Test_Opt_Senior',
+  acad_rigor_test_opt_junior:  'Acad_Rigor_Test_Opt_Junior',
+  acad_rigor_test_opt_soph:    'Acad_Rigor_Test_Opt_Soph',
+  acad_rigor_test_opt_freshman:'Acad_Rigor_Test_Opt_Freshman',
+  recruiting_q_link:           ['Recruiting Q Link', 'q_link'],
+  coach_link:                  ['Coach Page', 'coach_link'],
+  prospect_camp_link:          'Prospect Camp Link',
+  field_level_questionnaire:   'Field Level Questionnaire',
+  avg_gpa:                     'Avg GPA',
+  avg_sat:                     'Avg SAT',
+};
+
+// Transforms a raw Supabase schools row (snake_case) into the Sheet-style
+// key format the frontend expects. Array-valued entries in COLUMN_MAP produce
+// multiple keys on the output object so dual-fallback reads in scoring.js work.
+export function transformSchoolRow(row) {
+  const out = {};
+  for (const [col, target] of Object.entries(COLUMN_MAP)) {
+    const value = row[col];
+    if (Array.isArray(target)) {
+      target.forEach(key => { out[key] = value; });
+    } else {
+      out[target] = value;
+    }
+  }
+  // Pass through any columns not covered by COLUMN_MAP (e.g. last_updated).
+  for (const key of Object.keys(row)) {
+    if (!(key in COLUMN_MAP)) out[key] = row[key];
+  }
+  return out;
+}
+
 export async function fetchSchools() {
   if (!API_BASE) throw new Error("VITE_API_BASE not set. See README.");
   const res = await fetch(`${API_BASE}?action=db`);
