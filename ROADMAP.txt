@@ -529,6 +529,9 @@ SECTION 8 — RECOMMENDED NEXT SESSION SEQUENCE
 This is the order of operations for the next cold-start session.
 
 BEFORE ANY BUILD WORK OPENS
+  NOTE: Scout must run the PROTO-GLOBAL-014 session open gate before
+  any build work below begins. No step opens without it.
+
   1. Rio delivers D2 (version milestone structure) to Scout.
      If Rio has not delivered, Scout flags to Chris before proceeding.
 
@@ -561,6 +564,14 @@ THEN
 ================================================================
 SECTION 9 — GOVERNANCE REMINDERS
 ================================================================
+
+PROTO-GLOBAL-014 (session open gate)
+  Scout must run the session open gate before any build work begins
+  each session. No substantive work proceeds until the gate clears.
+
+PROTO-GLOBAL-013 (session close gate)
+  Scout holds the close gate at the end of every session. No session
+  is declared closed until the checklist is confirmed.
 
 PROTO-GLOBAL-010 (data source verification)
   All schema columns must be verified against the live data source
