@@ -189,62 +189,28 @@ export async function checkEmail(email) {
   const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   if (!emailRe.test(email)) return { hasAccount: false };
 
-  // Query profiles table for a row matching this email.
-  // profiles is readable only by the owner (RLS). To allow a pre-auth lookup,
-  // we query with the anon key. The profiles_insert_open policy allows anon
-  // INSERT; SELECT is owner-only. We use the service-role-equivalent path by
-  // checking the auth.users table indirectly via a Supabase auth admin call
-  // is not available on the anon key.
-  //
-  // Practical approach: attempt signInWithPassword with a dummy password — if
-  // the error is "Invalid login credentials" the account exists; if it is
-  // "Email not confirmed" the account exists but is pending. However, this
-  // leaks existence information via timing and is not reliable.
-  //
-  // Better approach: query the profiles table with a function that does not
-  // require auth. Since profiles RLS blocks anon SELECT, we use a Postgres
-  // RPC exposed as SECURITY DEFINER. Until that RPC exists (Step 7 scope),
-  // we fall back to the profiles_insert_open policy behavior: attempt an
-  // INSERT with status='check' to a temp path. That is not viable either.
-  //
-  // Step 6 resolution: query profiles via the anon-accessible path. The
-  // profiles table's SELECT policy requires auth_said() = said, which returns
-  // null for unauthenticated callers, blocking all rows. We cannot read
-  // profiles without auth.
-  //
-  // Interim approach: use Supabase Auth's OTP / magic link to probe existence
-  // is not available. The correct Step 6 approach is:
-  //   - Try to sign in; inspect the error code.
-  //   - "invalid_credentials" (user exists, wrong password) -> hasAccount: true
-  //   - "email_not_confirmed" -> hasAccount: true, pendingAccount: true
-  //   - User not found (error code 400 with specific message) -> hasAccount: false
-  //
-  // This is the least-bad approach available without a SECURITY DEFINER RPC.
-  // TODO Step 7: Replace with a dedicated check_email Supabase RPC that
-  // queries auth.users with SECURITY DEFINER, returning hasAccount + status
-  // without leaking credentials.
+  // Step 7: Use the check_email_exists SECURITY DEFINER RPC.
+  // This queries profiles directly without requiring an active session,
+  // replacing the dummy-password signInWithPassword probe used at Step 6.
+  // RPC defined in migration 20260322000006_step7_security_definer_rpcs.sql.
 
   try {
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password: "__gritfit_check_only__",
-    });
+    const { data, error } = await supabase.rpc("check_email_exists", { p_email: email });
 
-    if (!error) {
-      // Should not happen with a dummy password, but treat as existing account.
-      await supabase.auth.signOut();
-      return { hasAccount: true };
+    if (error) {
+      // RPC error — fall back to false rather than throwing.
+      console.error("checkEmail RPC error:", error.message);
+      return { hasAccount: false };
     }
 
-    const msg = error.message || "";
-    if (msg.includes("Invalid login credentials") || msg.includes("invalid_credentials")) {
-      return { hasAccount: true };
-    }
-    if (msg.includes("Email not confirmed") || msg.includes("email_not_confirmed")) {
-      return { hasAccount: true, pendingAccount: true };
-    }
-    // User does not exist or another error.
-    return { hasAccount: false };
+    // data is an array of rows (TABLE return type). First row is the result.
+    const row = Array.isArray(data) ? data[0] : data;
+    if (!row) return { hasAccount: false };
+
+    return {
+      hasAccount:     row.has_account     || false,
+      pendingAccount: row.pending_account || false,
+    };
   } catch {
     return { hasAccount: false };
   }
@@ -302,15 +268,38 @@ export async function saveRecruit(profile) {
 
   const said = data.said;
 
-  // Email notification is handled by Step 7 Edge Functions (Resend).
-  // At Step 6, email is not sent — no emailError to surface.
-  // TODO Step 7: invoke send-pending-account Edge Function here when deployed.
+  // Step 7: Invoke send-pending-account Edge Function.
+  // Skipped when testMode=true (no email in test mode per DEC ruling).
+  const testMode = profile.testMode || false;
+  let emailError;
+
+  if (!testMode && profile.email) {
+    try {
+      const { error: fnError } = await supabase.functions.invoke("send-pending-account", {
+        body: {
+          said,
+          name:         profile.name  || null,
+          email:        profile.email,
+          pendingToken,
+          resend:       false,
+        },
+      });
+      if (fnError) {
+        console.error("saveRecruit: send-pending-account error:", fnError.message);
+        emailError = fnError.message;
+      }
+    } catch (e) {
+      console.error("saveRecruit: send-pending-account threw:", e);
+      emailError = "Email delivery unavailable";
+    }
+  }
 
   return {
     ok: true,
     said,
     pendingToken,
-    testMode: profile.testMode || false,
+    ...(emailError && { emailError }),
+    testMode,
   };
 }
 
@@ -693,61 +682,34 @@ export async function completePendingAccount(said, pendingToken, password) {
     return { error: "said, pendingToken, and password are required." };
   }
 
-  // Verify the pending token against the profiles row.
-  // profiles SELECT is RLS-protected. We need to read the row to validate the
-  // token — this requires an anon-accessible path. Since the profiles
-  // profiles_insert_open policy allows INSERT but not SELECT without auth,
-  // we use the service role key equivalent via a Supabase RPC.
-  //
-  // Step 6 approach: attempt to read profiles by said using the anon client.
-  // The profiles_select_own policy requires auth_said() = said (RLS on JWT).
-  // Without a session, this will return 0 rows.
-  //
-  // TODO Step 7: Add a verify_pending_token(said, token) SECURITY DEFINER RPC
-  // that checks said + pending_token + pending_token_expiry without requiring
-  // an existing session, then returns the email so we can call signUp.
-  // For Step 6, we proceed to signUp with the email stored in the pending
-  // profile — but we cannot validate the token server-side without the RPC.
-  // This is a known Step 7 hardening item.
-  //
-  // Interim: trust the pendingToken as passed (frontend validates it came from
-  // the setup email link), then create the auth user.
+  // Step 7: Use verify_pending_token SECURITY DEFINER RPC.
+  // This validates said + pending_token + expiry without requiring an active
+  // session, and returns the email needed for signUp.
+  // RPC defined in migration 20260322000006_step7_security_definer_rpcs.sql.
+  const { data: verifyData, error: verifyError } = await supabase.rpc(
+    "verify_pending_token",
+    { p_said: said, p_token: pendingToken }
+  );
 
-  // We need the email to create the Supabase Auth user. Since we can't read
-  // the profile without auth, this function requires the caller to have the
-  // email available (it's in the URL params of the setup link in GAS flow,
-  // or stored in localStorage). If not available, this path requires the RPC.
-  //
-  // The GAS-era App.jsx passes said + pendingToken to this function from the
-  // URL params. Email is not passed. For Step 6, we cannot complete this
-  // without the email — return a clear error directing to Step 7.
-
-  // Attempt a profiles read using an unauthenticated supabase call.
-  // If the profile is accessible (e.g. RLS is open for anon on this path),
-  // we can get the email. Otherwise we fail gracefully.
-  const { data: profileRow, error: profileError } = await supabase
-    .from("profiles")
-    .select("email, status, pending_token, pending_token_expiry")
-    .eq("said", said)
-    .single();
-
-  if (profileError || !profileRow) {
-    return { error: "Profile not found. The setup link may have expired." };
+  if (verifyError) {
+    console.error("completePendingAccount: verify_pending_token RPC error:", verifyError.message);
+    return { error: "Could not verify setup token. Please try again." };
   }
 
-  if (profileRow.pending_token !== pendingToken) {
-    return { error: "Invalid setup token." };
+  // TABLE return type — first row is the result.
+  const verifyRow = Array.isArray(verifyData) ? verifyData[0] : verifyData;
+
+  if (!verifyRow || !verifyRow.ok) {
+    const errorMap = {
+      not_found:      "Profile not found. The setup link may have expired.",
+      token_mismatch: "Invalid setup token.",
+      expired:        "Setup link has expired. Request a new one.",
+      already_active: "Account is already active. Please sign in.",
+    };
+    return { error: errorMap[verifyRow?.error_code] || "Invalid setup link." };
   }
 
-  if (new Date(profileRow.pending_token_expiry) < new Date()) {
-    return { error: "Setup link has expired. Request a new one." };
-  }
-
-  if (profileRow.status === "active") {
-    return { error: "Account is already active. Please sign in." };
-  }
-
-  const email = profileRow.email;
+  const email = verifyRow.email;
   if (!email) {
     return { error: "No email on file for this profile." };
   }
@@ -818,42 +780,48 @@ export async function requestEmailChangeMagicLink(said, sessionToken, newEmail) 
 
 // ── 17. resendSetupEmail ──────────────────────────────────────────────────────
 // Re-sends the account setup email for a pending profile.
-// In the Supabase flow this regenerates a pending_token and invokes the
-// Step 7 Edge Function for email delivery.
-// TODO Step 7: invoke send-pending-account Edge Function when deployed.
+// Regenerates the pending_token (old link is invalidated) then invokes
+// the send-pending-account Edge Function with resend=true.
+//
+// Note: the profiles UPDATE with .eq("email", email) is RLS-gated and
+// requires an authenticated session. For a fully unauthenticated resend path,
+// a SECURITY DEFINER RPC would be needed (post-Stage-2 hardening).
+// At Stage 2, resend is initiated from an authenticated context (SettingsPage
+// or a post-login flow) so the RLS update path is reliable.
+//
 // Return shape: { ok } or { error }
 export async function resendSetupEmail(email) {
   if (!email) return { error: "Email is required." };
 
-  // Find the pending profile by email (anon-accessible path — same caveats as
-  // checkEmail; requires SECURITY DEFINER RPC at Step 7 for full reliability).
-  // For Step 6, we issue a new pending_token write after locating the profile.
-  // Since profiles SELECT is RLS-gated, this path only works if the caller
-  // has an active session (unlikely for resend flow). Step 7 hardens this.
-
-  // Regenerate pending token.
+  // Regenerate pending token (old token is overwritten — prior link invalid).
   const pendingToken = typeof crypto !== "undefined" && crypto.randomUUID
     ? crypto.randomUUID()
     : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
   const pendingTokenExpiry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
-  // Update the profile row. The WHERE email = ? update is RLS-gated — only
-  // works if the caller is authenticated. For an unauthenticated resend,
-  // this will silently affect 0 rows.
-  // TODO Step 7: replace with a SECURITY DEFINER RPC resend_setup_email(email).
-  const { error } = await supabase
+  // Write the new token to the profiles row.
+  const { error: updateError } = await supabase
     .from("profiles")
     .update({ pending_token: pendingToken, pending_token_expiry: pendingTokenExpiry })
     .eq("email", email)
     .eq("status", "pending");
 
-  if (error) return { error: error.message };
+  if (updateError) return { error: updateError.message };
 
-  // TODO Step 7: invoke Edge Function here:
-  // await supabase.functions.invoke('send-pending-account', {
-  //   body: { email, pendingToken }
-  // });
+  // Step 7: Invoke send-pending-account Edge Function with resend=true flag.
+  try {
+    const { error: fnError } = await supabase.functions.invoke("send-pending-account", {
+      body: { email, pendingToken, resend: true },
+    });
+    if (fnError) {
+      console.error("resendSetupEmail: send-pending-account error:", fnError.message);
+      return { error: "Profile updated but email delivery failed. Try again." };
+    }
+  } catch (e) {
+    console.error("resendSetupEmail: send-pending-account threw:", e);
+    return { error: "Profile updated but email delivery unavailable." };
+  }
 
   return { ok: true };
 }
@@ -894,18 +862,29 @@ export async function confirmEmailChangeMagicLink(said, token) {
 
 
 // ── 19. getSAIDStats ─────────────────────────────────────────────────────────
-// STUB — Step 7 Edge Function target.
-// TODO Step 7: implement as a Supabase RPC or Edge Function that queries
-// profiles with service_role key (anon key cannot read all rows due to RLS).
-// Return shape: { ok, count, latest } (placeholder — shape TBD at Step 7).
+// Returns SAID counters for Dexter/Sentinel health checks.
+// Step 7: Calls the get_said_stats() SECURITY DEFINER RPC.
+// RPC defined in migration 20260322000006_step7_security_definer_rpcs.sql.
+// Return shape: { ok, count, latest }
 export async function getSAIDStats() {
-  // Placeholder response. Sentinel health checks that call this function
-  // will receive a stub response until Step 7 is deployed.
-  return {
-    ok:     true,
-    count:  null,
-    latest: null,
-    _stub:  true,
-    _note:  "getSAIDStats is stubbed at Step 6. Implement at Step 7 via Supabase RPC or Edge Function.",
-  };
+  try {
+    const { data, error } = await supabase.rpc("get_said_stats");
+
+    if (error) {
+      console.error("getSAIDStats RPC error:", error.message);
+      return { ok: false, count: null, latest: null, error: error.message };
+    }
+
+    // TABLE return type — first row is the result.
+    const row = Array.isArray(data) ? data[0] : data;
+
+    return {
+      ok:     true,
+      count:  row?.count  ?? null,
+      latest: row?.latest ?? null,
+    };
+  } catch (e) {
+    console.error("getSAIDStats threw:", e);
+    return { ok: false, count: null, latest: null, error: String(e) };
+  }
 }
