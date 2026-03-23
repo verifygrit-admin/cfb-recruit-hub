@@ -71,7 +71,7 @@ export default function App() {
 
   useEffect(() => {
     fetchSchools()
-      .then(s => { setSchools(s); setDataLoaded(true); })
+      .then(s => { setSchools(s.schools || []); setDataLoaded(true); })
       .catch(e => setDataError(e.message));
     fetchTracker().then(setTracker).catch(() => {});
 
