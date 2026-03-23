@@ -1,6 +1,6 @@
 CFB-RECRUIT-HUB — STAGE 2 ROADMAP
 ===================================
-Last updated: 2026-03-19
+Last updated: 2026-03-22
 Maintained by: Scout (Chief of Staff)
 Filed by: Scribe on Scout's instruction
 Cross-ref:
@@ -102,58 +102,39 @@ The build sequence is Steps 6 through 10. Steps 1-5 (schema) are done.
 Do not reorder steps. Dependencies are stated explicitly for each step.
 
 ----------------------------------------------------------------
-SEEDING PIPELINE — REQUIRED BEFORE STEP 6 CAN BEGIN
+SEEDING PIPELINE — COMPLETE
 ----------------------------------------------------------------
 
-The schools table exists but has no data. Step 6 cannot be
-tested without data. The seeding pipeline is the immediate
-blocker for all downstream work.
-
 SEEDING STEP A — Google service account setup
-Owner: Chris (action required)
-Status: BLOCKED ON CHRIS
-  Six steps Patch provided in prior session:
-  1. Go to Google Cloud Console → create or select a project
-  2. Enable Google Sheets API for the project
-  3. Create a service account (IAM → Service Accounts → Create)
-  4. Download the JSON key file for the service account
-  5. Share the GrittyOS DB Google Sheet with the service account
-     email address (viewer access is sufficient for read-only sync)
-  6. Place the JSON key file at a path accessible to sync_schools.py
-     (do NOT commit this file — add to .gitignore)
-  Chris must complete this before Patch can build sync_schools.py
-  end-to-end.
+Owner: Chris
+Status: COMPLETE
 
 SEEDING STEP B — Data fixes in Google Sheet
-Owner: Chris (action required)
-Status: BLOCKED ON CHRIS
-  Four specific issues found by David during PC-2:
-  (a) Bryant University: add UNITID 217156 + IPEDS fields (missing)
-  (b) Commonwealth U of PA: remove 1 duplicate row
-  (c) PA Western U: remove 2 duplicate rows
-  (d) Notre Dame, UConn, UMass-Amherst: Type field is blank — Chris
-      to fill in correct division type for each school
-  These fixes must be applied before sync_schools.py is run.
-  Running sync with dirty data would seed incorrect records
-  into the schools table (PROTO-GLOBAL-010 applies).
+Owner: Chris
+Status: COMPLETE (2026-03-22)
+  All four issues resolved:
+  (a) Bryant University: UNITID corrected to 366139 (not 217156 — 217156 is Brown University)
+  (b) Commonwealth U of PA: 2 campuses retained (Bloomsburg 211158, Lock Haven 213613 —
+      separate football programs, intentional multi-row)
+  (c) PA Western U: 3 campuses retained (California 211361, Clarion 211644, Edinboro 212160 —
+      separate football programs, intentional multi-row)
+  (d) Notre Dame, UConn, UMass-Amherst: Type field filled in
+  Mansfield excluded (no football). Expected school count: 662.
 
 SEEDING STEP C — Build sync_schools.py
-Owner: Patch (primary)
-Status: NOT YET BUILT
-Depends on: Seeding Steps A and B both complete
+Owner: Patch
+Status: COMPLETE
   Script reads GrittyOS DB Sheet via gspread (Google service account).
-  Maps sheet columns to schools table columns using the same
-  COLUMN_MAP pattern already written in api.js.
-  Inserts into schools table via Supabase Python client.
+  Maps sheet columns to schools table columns using COLUMN_MAP pattern from api.js.
+  Inserts into schools table via Supabase REST API (PostgREST, not psycopg2).
   Idempotent: upsert on UNITID to support future IPEDS re-sync.
-  Option A (approved): gspread + Supabase Python client.
 
 SEEDING STEP D — Run sync_schools.py
-Owner: Patch (executes), David (verifies)
-Status: BLOCKED (depends on A, B, C)
-  David acceptance criteria:
-  - Row count matches GrittyOS DB (661 schools)
-  - UNITID uniqueness confirmed (no duplicates)
+Owner: Patch (executed), David (verified)
+Status: COMPLETE — 662 rows seeded, David PASS 2026-03-22
+  David acceptance criteria: ALL MET
+  - Row count: 662 (matches GrittyOS DB expected count)
+  - UNITID uniqueness: confirmed, no duplicates
   - Spot-check: 5 rows verified column-by-column against Sheet
 
 ----------------------------------------------------------------
@@ -161,8 +142,8 @@ STEP 6 — api.js FULL REWRITE (17 functions to Supabase)
 ----------------------------------------------------------------
 
 Owner: Patch (primary), Nova (executes)
-Status: BLOCKED on seeding pipeline
-Depends on: Seeding Steps A-D complete (need live data to test against)
+Status: IN PROGRESS (branch: feature/step-6-api-rewrite, opened 2026-03-22)
+Depends on: Seeding Steps A-D complete (COMPLETE — 662 rows, David PASS 2026-03-22)
 This is the largest single step. Every frontend data function gets
 rewired. No function signatures change. No caller file changes.
 All camelCase-to-snake_case mapping lives in api.js only.
@@ -339,28 +320,11 @@ CODE.GS RETIREMENT (DEC-CFB-008)
 SECTION 3 — BLOCKED ON CHRIS
 ================================================================
 
-These items cannot move until Chris takes action. Both are
-blocking the seeding pipeline, which blocks Step 6.
+All seeding pipeline blockers RESOLVED (2026-03-22). No items
+currently blocked on Chris.
 
-1. GOOGLE SERVICE ACCOUNT SETUP
-   What: Create service account in Google Cloud Console,
-         download JSON key, share GrittyOS DB Sheet with
-         service account email.
-   Why needed: sync_schools.py cannot authenticate to Google Sheets
-               without a service account. gspread requires it.
-   Blocked since: schema foundation session (2026-03-19 this session)
-   Unblocks: Seeding Step C (sync_schools.py build), Seeding Step D
-
-2. GOOGLE SHEET DATA FIXES
-   What: Four specific corrections to the GrittyOS DB Sheet:
-     (a) Bryant University: add UNITID 217156 + IPEDS fields
-     (b) Commonwealth U of PA: remove 1 duplicate row
-     (c) PA Western U: remove 2 duplicate rows
-     (d) Notre Dame, UConn, UMass-Amherst: fill in Type field
-   Why needed: seeding dirty data would violate PROTO-GLOBAL-010.
-               David cannot issue acceptance PASS on a dirty seed.
-   Blocked since: PC-2 session
-   Unblocks: Seeding Step D (run sync_schools.py)
+See SECTION 5 for open FLAGS requiring Patch resolution before
+Step 6 build work proceeds.
 
 ================================================================
 SECTION 4 — OVERDUE ITEMS
@@ -542,24 +506,14 @@ BEFORE ANY BUILD WORK OPENS
      If any doubt, re-run the test signUp and document the shape.
 
 THEN
-  4. Chris completes Seeding Step A (Google service account).
-     If Chris has not completed this, Patch builds sync_schools.py
-     locally but cannot run it end-to-end.
+  4. COMPLETE — Seeding pipeline done (662 rows, David PASS 2026-03-22).
+     Seeding Steps A-D all closed. No action required.
 
-  5. Chris applies Seeding Step B data fixes to the Sheet.
-     Can be done in parallel with Seeding Step A.
-
-  6. Patch builds sync_schools.py (Seeding Step C).
-     Depends on: Seeding Step A complete.
-
-  7. Seeding Step D: run sync_schools.py, David verifies.
-     Depends on: Steps A, B, C all done.
-
-  8. Open Step 6 (api.js rewrite) — Working Team meeting required.
+  5. Open Step 6 (api.js rewrite) — Working Team meeting required.
      Step 7 (Edge Functions) can open in parallel if a second
      agent thread is available.
 
-  9. Steps 8, 9, 10 follow in sequence after Step 6 is done.
+  6. Steps 8, 9, 10 follow in sequence after Step 6 is done.
 
 ================================================================
 SECTION 9 — GOVERNANCE REMINDERS
