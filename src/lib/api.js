@@ -809,10 +809,25 @@ export async function resendSetupEmail(email) {
 
   if (updateError) return { error: updateError.message };
 
+  // Retrieve said and name from the updated profile row — required by the
+  // send-pending-account Edge Function (returns 400 without said).
+  const { data: profileRow, error: selectError } = await supabase
+    .from("profiles")
+    .select("said, name")
+    .eq("email", email)
+    .eq("status", "pending")
+    .single();
+
+  if (selectError || !profileRow?.said) {
+    return { error: "Profile updated but could not retrieve SAID for email. Contact support." };
+  }
+
+  const { said, name } = profileRow;
+
   // Step 7: Invoke send-pending-account Edge Function with resend=true flag.
   try {
     const { error: fnError } = await supabase.functions.invoke("send-pending-account", {
-      body: { email, pendingToken, resend: true },
+      body: { said, name, email, pendingToken, resend: true },
     });
     if (fnError) {
       console.error("resendSetupEmail: send-pending-account error:", fnError.message);
