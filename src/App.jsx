@@ -746,7 +746,7 @@ export default function App() {
         </div>
       </header>
 
-      {dataError && <div className="data-error">Failed to load school data: {dataError}. Check VITE_API_BASE in .env</div>}
+      {dataError && <div className="data-error">Failed to load school data: {dataError}. Check VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in .env</div>}
 
       {/* Body */}
       <div className="app-body">
