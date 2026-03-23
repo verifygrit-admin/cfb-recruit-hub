@@ -138,17 +138,17 @@ Status: COMPLETE — 662 rows seeded, David PASS 2026-03-22
   - Spot-check: 5 rows verified column-by-column against Sheet
 
 ----------------------------------------------------------------
-STEP 6 — api.js FULL REWRITE (17 functions to Supabase)
+STEP 6 — api.js FULL REWRITE (19 functions to Supabase)
 ----------------------------------------------------------------
 
 Owner: Patch (primary), Nova (executes)
-Status: IN PROGRESS (branch: feature/step-6-api-rewrite, opened 2026-03-22)
+Status: COMPLETE (2026-03-22, commit 33801cc, 19 functions, PR #3 open)
 Depends on: Seeding Steps A-D complete (COMPLETE — 662 rows, David PASS 2026-03-22)
 This is the largest single step. Every frontend data function gets
 rewired. No function signatures change. No caller file changes.
 All camelCase-to-snake_case mapping lives in api.js only.
 
-17 functions to rewrite (inventory in Gate 7 spec, Item 1):
+19 functions to rewrite (inventory in Gate 7 spec, Item 1):
   getSchools()            — SELECT from schools table
   getSchoolByUnitid()     — SELECT single school by unitid
   checkEmail()            — SELECT from profiles (status field)
@@ -179,7 +179,7 @@ PRE-STEP-6 FLAGS (resolve before first build session opens)
     not silently accepted. Verify before writing saveShortList().
 
 DONE CONDITION — Step 6
-  All 17 functions rewritten and returning correct shapes.
+  All 19 functions rewritten and returning correct shapes.
   Quin confirms return shapes match prior api.js surface
   (no caller changes required).
   Seeding data available for end-to-end manual test.
