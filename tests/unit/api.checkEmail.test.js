@@ -6,26 +6,26 @@
  * SCOPE BOUNDARY: TC-1 through TC-4 are Step 6 gate tests.
  * TC-5 through TC-7 are Step 10 Track A tests — DO NOT build those here.
  *
- * SOURCE CODE BEHAVIOR AS READ (src/lib/api.js line 133-138):
- *   checkEmail(email) returns { hasAccount: false } when:
- *     (a) !API_BASE is truthy, OR
- *     (b) !email is truthy (undefined, null, empty string)
- *   For any other truthy email string, it proceeds to fetch() regardless of
- *   format. There is no regex/format validation in the current implementation.
+ * UPDATED FOR STEP 6 (api.js Supabase rewrite):
+ *   checkEmail() no longer calls globalThis.fetch directly. It now calls
+ *   supabase.auth.signInWithPassword() internally. TC-2 and TC-4 have been
+ *   updated to mock the Supabase client per the "After Step 6" note in the
+ *   original test comments.
  *
- *   IMPORTANT FINDING: VITE_API_BASE is populated in the test environment
- *   (resolves to the live Apps Script URL via import.meta.env). TC-2 documents
- *   that malformed email strings reach the network — there is no format guard.
- *   This is a coverage gap surfaced by these tests, not a test authoring error.
- *   The gap should be routed to Patch/Nova for Step 6 when checkEmail() is
- *   rewritten against Supabase Auth.
+ *   Step 6 behavior:
+ *     (a) !email guard returns { hasAccount: false } (unchanged)
+ *     (b) Email format validation (Quin Finding 2) — malformed emails now
+ *         return { hasAccount: false } before any Supabase call.
+ *     (c) Valid email: calls supabase.auth.signInWithPassword with dummy
+ *         password; interprets error message to determine account existence.
  *
- * After Step 6: TC-2 and TC-4 must be updated to mock the Supabase client
- * instead of globalThis.fetch.
+ * TC-2 note: malformed email 'not-an-email' now fails the format regex and
+ * returns { hasAccount: false } WITHOUT reaching the Supabase client.
+ * The original coverage gap (Quin Finding 2) is now fixed at Step 6.
  */
 
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { checkEmail } from '../../src/lib/api.js';
+import { checkEmail, supabase } from '../../src/lib/api.js';
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -43,22 +43,16 @@ describe('checkEmail() guard clauses (Step 6 gate)', () => {
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
-  // TC-2: malformed email string — NO format validation exists in current impl.
-  // A truthy string bypasses the !email guard and reaches fetch(). The fetch
-  // may succeed or fail depending on network state; either way the function
-  // returns { hasAccount: false } on failure (line 136: if (!res.ok) return { hasAccount: false }).
-  // This TC asserts the shape contract only — not whether fetch was called.
-  // COVERAGE GAP: checkEmail() accepts 'not-an-email' without format rejection.
-  // Route to Patch for Step 6 spec: add email format validation before network call.
-  it('TC-2: returns { hasAccount: false } for malformed email (no format validation in current impl)', async () => {
-    // Mock fetch so no live network call is made during tests
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
-      ok: false,
-      json: async () => ({}),
-    });
+  // TC-2: malformed email string — Step 6 adds email format validation (Quin Finding 2).
+  // 'not-an-email' now fails the format regex and returns { hasAccount: false }
+  // WITHOUT reaching the Supabase client. No mock needed.
+  it('TC-2: returns { hasAccount: false } for malformed email (format validation added at Step 6)', async () => {
+    const signInSpy = vi.spyOn(supabase.auth, 'signInWithPassword');
     const result = await checkEmail('not-an-email');
     expect(result).toEqual({ hasAccount: false });
     expect(typeof result.hasAccount).toBe('boolean');
+    // Format guard fires before Supabase call — no network call made
+    expect(signInSpy).not.toHaveBeenCalled();
   });
 
   // TC-3: empty string email → !email guard fires (empty string is falsy)
@@ -71,14 +65,15 @@ describe('checkEmail() guard clauses (Step 6 gate)', () => {
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
-  // TC-4: valid email with mocked successful network response
-  // Mocks fetch to return { ok: true, json: () => ({ hasAccount: true }) }.
-  // Asserts that the return shape on a successful response is { hasAccount: boolean }.
-  // After Step 6: this TC must be updated to mock the Supabase auth client.
-  it('TC-4: returns consistent shape on valid input with mocked network response', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
-      ok: true,
-      json: async () => ({ hasAccount: true }),
+  // TC-4: valid email with mocked Supabase signInWithPassword response.
+  // Updated for Step 6: mocks supabase.auth.signInWithPassword instead of
+  // globalThis.fetch (per the original "After Step 6" note in this file).
+  // Simulates the "Invalid login credentials" error that indicates the account
+  // exists (user is present but wrong password was used by the probe call).
+  it('TC-4: returns { hasAccount: true } when Supabase signals existing account', async () => {
+    vi.spyOn(supabase.auth, 'signInWithPassword').mockResolvedValue({
+      data:  { user: null, session: null },
+      error: { message: 'Invalid login credentials' },
     });
     const result = await checkEmail('valid@example.com');
     // Shape: must have a hasAccount boolean
