@@ -230,8 +230,11 @@ export async function saveRecruit(profile) {
 
   const pendingTokenExpiry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
+  const { data: { user } = {} } = await supabase.auth.getUser().catch(() => ({ data: {} }));
+
   const row = {
     // said is left null — generate_said() trigger assigns it on INSERT
+    user_id:              user?.id || null,
     name:                 profile.name          || null,
     high_school:          profile.highSchool     || null,
     grad_year:            profile.gradYear       ? parseInt(profile.gradYear, 10) : null,
