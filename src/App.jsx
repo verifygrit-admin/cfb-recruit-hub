@@ -582,7 +582,7 @@ export default function App() {
                 setSaid(r.said);
                 await linkSaidToAuth(r.said);
               }
-            } catch { /* still show results below */ }
+            } catch (e) { console.error('saveRecruit failed:', e); }
             revealResults(res);
           }
           setSavedIdentity({ name: athlete.name, email: auth.email });
