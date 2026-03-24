@@ -350,6 +350,12 @@ test('Short list saves and restores across sign-out / sign-in', async ({ page })
   await dismissResultsModalIfPresent(page);
   await page.waitForSelector('.summary-bar', { state: 'visible', timeout: 15000 });
 
+  // Step 0e-wait: Wait for handleSubmit to fully complete (saveRecruit +
+  // linkSaidToAuth). The submit button is disabled={loading} during the async
+  // chain and re-enables only in the finally{} block after both Supabase calls
+  // settle. This is the deterministic gate — no fixed timeout needed.
+  await page.waitForSelector('button.form-submit:not([disabled])', { timeout: 15000 });
+
   // Step 0f: Sign out to reset state before the persistence test
   await signOut(page);
   await waitForSignOutComplete(page);
