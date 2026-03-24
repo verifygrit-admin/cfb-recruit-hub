@@ -312,6 +312,9 @@ test('Short list saves and restores across sign-out / sign-in', async ({ page })
     test.skip(true, 'TEST_EMAIL / TEST_PASSWORD not set — skipping short list test');
   }
 
+  page.on('console', msg => console.log('BROWSER:', msg.text()));
+  page.on('pageerror', err => console.log('PAGE ERROR:', err.message));
+
   await gotoApp(page);
 
   // ── Step 0: Profile Bootstrap ─────────────────────────────────────────────
