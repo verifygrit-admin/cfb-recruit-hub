@@ -93,6 +93,55 @@ BL-007 | 2026-03-22 | Morty (Stage 1 close-out architecture check) | MEDIUM | Op
   Stage 2 kickoff: YES — on agenda (performance baseline before real user traffic)
   Do NOT touch until explicitly scheduled.
 
+BL-008 | 2026-03-23 | Scout (Test 4 setup — schema audit) | MEDIUM | Open
+  MORTY SCOPE — separate schema session required.
+  profiles.email has no UNIQUE constraint at the database level.
+  saveRecruit uses .insert() (not .upsert()), meaning a second
+  form submission with the same email address will create a
+  duplicate profiles row rather than routing to updateRecruit.
+  Scope of impact: any real athlete who submits the form twice
+  under the same email currently receives two separate profile
+  rows in the profiles table. The isNewPerson routing in App.jsx
+  is an app-level guard only — it does not prevent duplicates at
+  the database layer if the guard is bypassed or fails silently.
+  Fix requires: (1) a new migration adding UNIQUE constraint on
+  profiles.email, (2) Chris's approval before the migration runs
+  (schema change on a live table), (3) Morty to audit the full
+  impact surface — RLS policy interactions, Edge Function behavior
+  on conflict, and whether .insert() should be converted to
+  .upsert() with a conflict target across any code paths.
+  Context: surfaced during Test 4 setup step, 2026-03-23 session.
+  Scout ruling: INSERT vs upsert gap is a schema-level risk, not
+  an app-level fix. Do NOT implement until Morty audit is complete
+  and Chris approves the migration approach.
+  File: supabase/migrations/ (new migration, not yet drafted)
+  Related: DEC-CFB-007 (RLS policy set), DEC-CFB-008 (Morty PASS gate)
+  Do NOT touch until explicitly scheduled.
+
+BL-009 | 2026-03-23 | Scout (Test 4 setup — defensive idempotency) | MEDIUM | Open
+  MORTY SCOPE — separate session, assess after BL-008 is resolved.
+  Scout Level 2 recommendation: add a check_email_exists RPC call
+  before form submission in Test 4's setup step as a defensive
+  idempotency check. Currently deferred in favor of Quin's simpler
+  spec (Test 4 relies on app-level isNewPerson / updateRecruit
+  routing for existing profiles rather than a pre-submission RPC
+  check). The question is whether the isNewPerson routing is
+  reliable enough to be the sole guard, or whether a check_email_exists
+  call before submission provides meaningful defense against duplicate
+  inserts. Morty should assess: (1) reliability of isNewPerson routing
+  under edge cases (e.g., race conditions, stale state), (2) whether
+  the check_email_exists RPC currently exists and is callable from
+  the test setup context, (3) whether adding this call is warranted
+  given BL-008's UNIQUE constraint outcome — if the constraint is
+  added, the duplicate-on-insert risk is caught at the DB layer and
+  the defensive RPC call may be redundant.
+  Context: Test 4 setup step, 2026-03-23 session. Scout deferred
+  this recommendation at Quin's request to keep the spec simple.
+  Dependency: BL-008 resolution may render this item moot or change
+  its recommendation. Morty should assess BL-008 first.
+  Related: Quin's QA-SPEC-001, TC-5/TC-6 (api.checkEmail), Step 10 Track A.
+  Do NOT touch until explicitly scheduled and BL-008 outcome is known.
+
 ================================================================
 
 INSTRUCTIONS FOR SCRIBE

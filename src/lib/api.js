@@ -348,6 +348,19 @@ export async function updateRecruit(profile) {
 }
 
 
+// ── 6b. linkSaidToAuth ────────────────────────────────────────────────────────
+// Stores the SAID in the current auth user's user_metadata so that future
+// sign-ins return it via auth_said(). Used when a signed-in user without
+// a profile submits the form for the first time (edge case: auth user
+// provisioned outside the normal saveRecruit → createAccount flow).
+// Return shape: { ok }
+export async function linkSaidToAuth(said) {
+  const { error } = await supabase.auth.updateUser({ data: { said } });
+  if (error) throw new Error(`linkSaidToAuth: ${error.message}`);
+  return { ok: true };
+}
+
+
 // ── 7. createAccount ─────────────────────────────────────────────────────────
 // Creates a Supabase Auth user tied to an existing profiles row (identified by
 // said). The said is stored in user_metadata so auth_said() can extract it

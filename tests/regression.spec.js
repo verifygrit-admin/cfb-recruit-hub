@@ -314,54 +314,72 @@ test('Short list saves and restores across sign-out / sign-in', async ({ page })
 
   await gotoApp(page);
 
-  // ── Step 1: Sign in ──
+  // ── Step 0: Profile Bootstrap ─────────────────────────────────────────────
+  // Ensures the test account has a profiles row with GRIT FIT results.
+  // On first run: signed-in submit creates a profile via saveRecruit + linkSaidToAuth.
+  // On subsequent runs: updateRecruit fires (idempotent). See QA-SPEC-T4-SETUP-001.
+
+  // Step 0a: Sign in
   await openSignInModal(page);
   await fillSignIn(page, TEST_EMAIL, TEST_PASSWORD);
   await waitForSignInComplete(page);
   await dismissResultsModalIfPresent(page);
 
-  // Wait for school data to load (the app fetches schools on mount)
-  await page.waitForSelector('.leaflet-container, .loading-screen', { timeout: 20000 });
+  // Step 0b: Navigate to My GRIT Fit
+  await page.click('.nav-dropdown-btn');
+  await page.click('.nav-dropdown-item:has-text("My GRIT Fit")');
+  await page.waitForSelector('.form-wrapper', { state: 'visible', timeout: 10000 });
 
-  // If still on loading screen, wait for it to resolve
+  // Step 0c: Fill required fields using TEST_ATHLETE data
+  await page.fill('input[placeholder="Full Name"]', TEST_ATHLETE.name);
+  await page.fill('input[placeholder="Anytown High School"]', TEST_ATHLETE.highSchool);
+  await page.fill('input[placeholder="PA"]', TEST_ATHLETE.state);
+  await page.selectOption('select:near(:text("Expected Grad Year"))', TEST_ATHLETE.gradYear);
+  await page.fill('input[placeholder="athlete@email.com"]', TEST_EMAIL);
+  await page.selectOption('select:near(:text("Primary Position"))', TEST_ATHLETE.position);
+  await page.fill('input[placeholder="72"]', TEST_ATHLETE.height);
+  await page.fill('input[placeholder="185"]', TEST_ATHLETE.weight);
+  await page.fill('input[placeholder="4.60"]', TEST_ATHLETE.speed40);
+  await page.fill('input[placeholder="3.20"]', TEST_ATHLETE.gpa);
+
+  // Step 0d: Submit — for signed-in users the button is "Update My GRIT Fit →"
+  // or "Generate My GRIT Fit →"; .form-submit matches both.
+  await page.locator('.form-submit').first().click();
+
+  // Step 0e: Dismiss results modal and confirm summary bar
+  await dismissResultsModalIfPresent(page);
+  await page.waitForSelector('.summary-bar', { state: 'visible', timeout: 15000 });
+
+  // Step 0f: Sign out to reset state before the persistence test
+  await signOut(page);
+  await waitForSignOutComplete(page);
+
+  // ── Step 1: Sign in (profile should auto-restore with results) ──
+  await openSignInModal(page);
+  await fillSignIn(page, TEST_EMAIL, TEST_PASSWORD);
+  await waitForSignInComplete(page);
+  await dismissResultsModalIfPresent(page);
+
+  // Wait for school data to load
+  await page.waitForSelector('.leaflet-container, .loading-screen', { timeout: 20000 });
   const loadingScreen = page.locator('.loading-screen');
   if (await loadingScreen.isVisible()) {
     await loadingScreen.waitFor({ state: 'detached', timeout: 20000 });
   }
 
   // ── Step 2: Add a school to the short list ──
-  // Strategy A: Use the Results Table if results have been auto-restored.
-  // Strategy B: Click a map marker and use the popup "Add to Short List" button.
-  //
-  // We prefer Strategy A (table) because map markers require knowing a school's
-  // coordinates. After sign-in with a profile, results should auto-restore and
-  // the user is placed in quicklist mode.
-  //
-  // SELECTOR NOTE: The "Add to Short List" button in ResultsTable is not yet
-  // confirmed — the exact button text/class in ResultsTable.jsx was not fully
-  // visible. Using best-guess selectors; flagged for manual inspection.
+  // After sign-in with a profile, results auto-restore and summary-bar appears.
+  await page.waitForSelector('.summary-bar', { state: 'visible', timeout: 15000 });
 
-  // Check if we're in quicklist mode with results (summary-bar present = results loaded)
-  const hasSummaryBar = await page.locator('.summary-bar').isVisible().catch(() => false);
+  // Switch to Table view to use the ResultsTable add-to-short-list button
+  await page.click('.panel-btn:has-text("Table")');
+  await page.waitForSelector('table, .results-table', { state: 'visible', timeout: 10000 });
 
-  if (hasSummaryBar) {
-    // Switch to Table view to use the ResultsTable add-to-short-list button
-    await page.click('.panel-btn:has-text("Table")');
-    await page.waitForSelector('table, .results-table', { state: 'visible', timeout: 10000 });
-
-    // Click the first short-list toggle button in the table.
-    // Class: .sl-toggle-btn  |  "not added" state text: "+"  |  title: "Add to Short List"
-    const addBtn = page.locator('.sl-toggle-btn[title="Add to Short List"]').first();
-    if (await addBtn.isVisible()) {
-      await addBtn.click();
-      await page.waitForTimeout(500);
-    }
-  } else {
-    // Not in results mode — navigate to Browse and click a map marker
-    // This path is harder to automate reliably; we attempt it but note the limitation.
-    // Skip this sub-path if no results are available (test account may need a profile).
-    test.skip(true, 'No GRIT Fit results available for short-list test — ensure TEST_EMAIL account has a saved profile with results');
-  }
+  // Click the first short-list toggle button in the table.
+  const addBtn = page.locator('.sl-toggle-btn[title="Add to Short List"]').first();
+  await addBtn.waitFor({ state: 'visible', timeout: 10000 });
+  await addBtn.click();
+  await page.waitForTimeout(500);
 
   // ── Step 3: Sign out ──
   await signOut(page);

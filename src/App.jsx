@@ -10,7 +10,7 @@ import HelmetAnim from "./components/HelmetAnim.jsx";
 import StayGrittyModal from "./components/StayGrittyModal.jsx";
 import AuthModal from "./components/AuthModal.jsx";
 import SettingsPage from "./components/SettingsPage.jsx";
-import { fetchSchools, fetchTracker, saveRecruit, updateRecruit, geocodeHighSchool, saveShortList, getShortList, validateToken, signOut, completePendingAccount, confirmEmailChangeMagicLink, checkEmail, resendSetupEmail } from "./lib/api.js";
+import { fetchSchools, fetchTracker, saveRecruit, updateRecruit, linkSaidToAuth, geocodeHighSchool, saveShortList, getShortList, validateToken, signOut, completePendingAccount, confirmEmailChangeMagicLink, checkEmail, resendSetupEmail } from "./lib/api.js";
 import { runQuickList, getClassLabel } from "./lib/scoring.js";
 import grittyOsLogo from "./assets/grittyos-logo.png";
 
@@ -570,7 +570,19 @@ export default function App() {
         } else {
           // Editing current profile — always use auth.email; email changes handled in Settings
           revealResults(res);
-          updateRecruit({ ...parsed, email: auth.email, said, timestamp: new Date().toISOString() }).catch(() => {});
+          if (said) {
+            updateRecruit({ ...parsed, email: auth.email, said, timestamp: new Date().toISOString() }).catch(() => {});
+          } else {
+            // Auth user without a profile — create one and link SAID to auth metadata
+            saveRecruit({ ...parsed, email: auth.email, timestamp: new Date().toISOString() })
+              .then(r => {
+                if (r?.said) {
+                  setSaid(r.said);
+                  linkSaidToAuth(r.said).catch(() => {});
+                }
+              })
+              .catch(() => {});
+          }
           setSavedIdentity({ name: athlete.name, email: auth.email });
           setNewProfileMode(false);
         }
