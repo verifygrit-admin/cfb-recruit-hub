@@ -346,15 +346,12 @@ test('Short list saves and restores across sign-out / sign-in', async ({ page })
   // or "Generate My GRIT Fit →"; .form-submit matches both.
   await page.locator('.form-submit').first().click();
 
-  // Step 0e: Dismiss results modal and confirm summary bar
+  // Step 0e: Dismiss results modal and confirm summary bar.
+  // On first run (no profile), revealResults is deferred until AFTER saveRecruit +
+  // linkSaidToAuth complete. So .summary-bar appearing IS the completion signal —
+  // the SAID is already stored in user_metadata by the time results render.
   await dismissResultsModalIfPresent(page);
-  await page.waitForSelector('.summary-bar', { state: 'visible', timeout: 15000 });
-
-  // Step 0e-wait: Wait for handleSubmit to fully complete (saveRecruit +
-  // linkSaidToAuth). The submit button is disabled={loading} during the async
-  // chain and re-enables only in the finally{} block after both Supabase calls
-  // settle. This is the deterministic gate — no fixed timeout needed.
-  await page.waitForSelector('button.form-submit:not([disabled])', { timeout: 15000 });
+  await page.waitForSelector('.summary-bar', { state: 'visible', timeout: 20000 });
 
   // Step 0f: Sign out to reset state before the persistence test
   await signOut(page);

@@ -569,19 +569,21 @@ export default function App() {
           setNewProfileMode(false);
         } else {
           // Editing current profile — always use auth.email; email changes handled in Settings
-          revealResults(res);
           if (said) {
+            revealResults(res);
             updateRecruit({ ...parsed, email: auth.email, said, timestamp: new Date().toISOString() }).catch(() => {});
           } else {
-            // Auth user without a profile — create one and link SAID to auth metadata.
-            // Awaited so the SAID is stored in user_metadata before the user can navigate away.
+            // Auth user without a profile — save + link SAID before showing results.
+            // revealResults is deferred so the SAID is in user_metadata when the user
+            // can next interact (sign out, navigate away). Spinner stays visible until done.
             try {
               const r = await saveRecruit({ ...parsed, email: auth.email, timestamp: new Date().toISOString() });
               if (r?.said) {
                 setSaid(r.said);
                 await linkSaidToAuth(r.said);
               }
-            } catch { /* revealResults already showed results */ }
+            } catch { /* still show results below */ }
+            revealResults(res);
           }
           setSavedIdentity({ name: athlete.name, email: auth.email });
           setNewProfileMode(false);
