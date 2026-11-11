@@ -36,8 +36,10 @@ export default function MapView({ schools, results, mode, filters, shortListIds 
       tap: false,            // disables Leaflet's tap emulation to avoid double-fire on mobile
       closePopupOnClick: false, // prevents background tap from closing an open popup
     });
-    L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
-      attribution: '&copy; <a href="https://carto.com/">CARTO</a>',
+    // CARTO basemaps require a free API key. Key lives in VITE_CARTO_BASEMAP_KEY.
+    const cartoKey = import.meta.env.VITE_CARTO_BASEMAP_KEY || "";
+    L.tileLayer(`https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}{r}.png?key=${cartoKey}`, {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/">CARTO</a>',
       maxZoom: 18,
     }).addTo(leafletRef.current);
   }, []);
